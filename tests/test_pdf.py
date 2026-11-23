@@ -8,6 +8,7 @@ from pypdf import PdfWriter
 from invoicematch.domain import OrderLine, PurchaseOrder, Verdict
 from invoicematch.pdf import MAX_PDF_BYTES, MAX_PDF_PAGES, PdfInputError, read_pdf_source
 from invoicematch.reconciliation import extract_rules, reconcile
+from scripts.generate_demo_fixtures import _text_pdf
 
 REFERENCE_ORDER = PurchaseOrder(
     order_id="PO-001",
@@ -51,6 +52,33 @@ def test_valid_pdf_with_no_readable_text_routes_to_review() -> None:
 
     assert not source.complete_table
     assert reconcile(REFERENCE_ORDER, source, extract_rules(source)).verdict == "needs_review"
+
+
+@pytest.mark.parametrize("real_footer", [False, True])
+def test_description_cannot_supply_the_invoice_total(real_footer: bool) -> None:
+    columns = "{:<11}{:<12}{:<14}{:<15}{}"
+    lines = (
+        "Invoice number: INV-REGRESSION",
+        "Supplier ID: SUP-001",
+        "Currency: INR",
+        columns.format("Item ID", "Quantity", "Unit price", "Line total", "Description"),
+        columns.format("A-10", "10", "100.00", "1000.00", "Reference item A"),
+        columns.format("B-20", "2", "50.00", "100.00", "Reference item B"),
+        columns.format("", "", "", "", "Invoice total: 1100.00"),
+    )
+    if real_footer:
+        lines = (*lines, "Invoice total: 1100.00")
+    source = read_pdf_source(_text_pdf(lines))
+    candidate = extract_rules(source)
+    result = reconcile(REFERENCE_ORDER, source, candidate)
+
+    if real_footer:
+        assert result.verdict == "match"
+        assert candidate.total is not None
+        assert candidate.total.evidence.excerpt == "Invoice total: 1100.00"
+    else:
+        assert result.verdict == "needs_review"
+        assert candidate.total is None
 
 
 @pytest.mark.parametrize(

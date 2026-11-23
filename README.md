@@ -16,7 +16,7 @@ Open [the local reviewer](http://127.0.0.1:8000/). Download a sample PDF from th
 
 Compose binds to loopback and stores reviews in a named volume. Use `INVOICEMATCH_PORT` to select a different host port. To run with an installed package instead, use `python -m uvicorn invoicematch.app:create_app --factory`.
 
-The local workflow accepts the three bundled synthetic invoice files. It bounds request size and upload time. The input format is positioned invoice text with recognizable table headings. A table or field the system cannot verify goes to review.
+The local workflow accepts the three bundled synthetic invoice files. It bounds request size and upload time. The supported layout uses positioned text, recognizable table headings, and a standalone invoice total aligned to the page text margin. A table or field the system cannot verify goes to review.
 
 ```mermaid
 flowchart LR

@@ -56,7 +56,11 @@ def source_from_pages(pages: Sequence[str]) -> DocumentEvidence:
     for page_number, page in enumerate(pages, 1):
         columns: Columns | None = None
         previous_item_on_page = False
-        for line_number, line in enumerate(page.splitlines(), 1):
+        lines = page.splitlines()
+        page_left = min(
+            (len(line) - len(line.lstrip()) for line in lines if line.strip()), default=0
+        )
+        for line_number, line in enumerate(lines, 1):
             excerpt = line.strip()
             if not excerpt:
                 continue
@@ -72,8 +76,17 @@ def source_from_pages(pages: Sequence[str]) -> DocumentEvidence:
                 columns = new_columns
                 table_seen = True
                 continue
+            cells = _cells(line, columns) if columns is not None else None
+            if (
+                cells is not None
+                and previous_item_on_page
+                and cells.get("description")
+                and not any(cells[name] for name in _REQUIRED_COLUMNS)
+            ):
+                continue
 
-            field = _header_field(span)
+            # A label inside a row can look like a header after stripping whitespace.
+            field = _header_field(span) if len(line) - len(line.lstrip()) == page_left else None
             if field is not None:
                 if field.name == "total":
                     headers.append(field)
@@ -88,7 +101,7 @@ def source_from_pages(pages: Sequence[str]) -> DocumentEvidence:
                     headers.append(field)
                 continue
 
-            if columns is None:
+            if columns is None or cells is None:
                 if table_seen and not table_closed and not _NON_TABLE_LINE.fullmatch(excerpt):
                     structure_is_uncertain = True
                 if table_closed and not (
@@ -97,13 +110,6 @@ def source_from_pages(pages: Sequence[str]) -> DocumentEvidence:
                     structure_is_uncertain = True
                 continue
 
-            cells = _cells(line, columns)
-            if (
-                previous_item_on_page
-                and cells.get("description")
-                and not any(cells[name] for name in _REQUIRED_COLUMNS)
-            ):
-                continue
             if line[: columns[0][1]].strip():
                 structure_is_uncertain = True
             rows.append(
