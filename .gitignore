@@ -1,0 +1,42 @@
+# Private project notes
+/agent.md
+/project.md
+
+# Python environments and build output
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Test, lint, type-check, and coverage output
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local credentials and runtime data
+.env
+.env.*
+!.env.example
+/instance/
+/uploads/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+
+# Local editor and OS files
+/.vscode/
+/.idea/
+.DS_Store
+Thumbs.db
