@@ -4,11 +4,13 @@ import subprocess
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, closing
 from importlib.resources import files
+from io import BytesIO
 from pathlib import Path
 from threading import Event
 
 import pytest
 from httpx import ASGITransport, AsyncClient, Response
+from pypdf import PdfReader, PdfWriter
 
 from invoicematch import storage, workers
 from invoicematch.app import create_app
@@ -178,6 +180,45 @@ async def test_mapping_is_audited_and_keeps_original_extraction(tmp_path: Path) 
         assert review["mappings"][0]["mapping"]["items"] == {"ACME-7": "PART-7"}
         assert review["decisions"][0]["verdict"] == "mismatch"
         assert (await client.get(f"/api/reviews/{identifier}")).json() == review
+        stale_mapping = await client.put(
+            f"/api/reviews/{identifier}/mapping", json={"expected_mapping_revision": 0}
+        )
+        assert stale_mapping.status_code == 409
+        assert stale_mapping.json()["detail"]["code"] == "review_version_conflict"
+        stale = await client.post(
+            f"/api/reviews/{identifier}/decisions",
+            json={"decision": "reject", "expected_mapping_revision": 0},
+        )
+        assert stale.status_code == 409
+        assert stale.json()["detail"]["code"] == "review_version_conflict"
+        current = await client.post(
+            f"/api/reviews/{identifier}/decisions",
+            json={"decision": "accept", "expected_mapping_revision": 1},
+        )
+        assert current.status_code == 201
+        assert [event["verdict"] for event in current.json()["decisions"]] == ["mismatch", "match"]
+
+
+async def test_cached_review_requires_active_session_after_streaming(tmp_path: Path) -> None:
+    database = tmp_path / "reviews.sqlite3"
+    data = sample()
+
+    async def expiring_upload() -> AsyncIterator[bytes]:
+        yield data[:16]
+        with closing(sqlite3.connect(database)) as connection, connection:
+            connection.execute("UPDATE session_expiry SET expires_at=0")
+        yield data[16:]
+
+    async with reviewer(database) as client:
+        assert (await upload(client, data, order="PO-001")).status_code == 201
+        retry = await client.post(
+            "/api/reviews",
+            params={"order_id": "PO-001"},
+            content=expiring_upload(),
+            headers={"Content-Type": "application/pdf"},
+        )
+        assert retry.status_code == 401
+        assert retry.json()["detail"]["code"] == "session_expired"
 
 
 async def test_custom_data_is_private_and_session_deletion_cleans_records(tmp_path: Path) -> None:
@@ -224,6 +265,27 @@ async def test_custom_pdf_checks_and_no_provider_transmission(tmp_path: Path) ->
         unreadable = await upload(client, _text_pdf(("No machine-readable invoice fields",)))
         assert unreadable.status_code == 201
         assert unreadable.json()["result"]["verdict"] == "needs_review"
+
+
+@pytest.mark.parametrize("add_title", [False, True])
+async def test_unreadable_page_cannot_be_ignored_in_an_otherwise_matching_pdf(
+    tmp_path: Path, add_title: bool
+) -> None:
+    output = BytesIO()
+    writer = PdfWriter()
+    writer.add_page(PdfReader(BytesIO(invoice())).pages[0])
+    if add_title:
+        writer.add_page(PdfReader(BytesIO(_text_pdf(("Page 2",)))).pages[0])
+    else:
+        writer.add_blank_page(width=612, height=792)
+    writer.write(output)
+    async with reviewer(tmp_path / "reviews.sqlite3") as client:
+        await save_order(client)
+        uploaded = await upload(client, output.getvalue())
+        assert uploaded.status_code == 201
+        result = uploaded.json()["result"]
+        assert result["verdict"] == "needs_review"
+        assert {finding["code"] for finding in result["findings"]} == {"incomplete_table"}
 
 
 async def test_replays_preserve_all_sample_scenarios_without_provider(

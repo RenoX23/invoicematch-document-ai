@@ -94,6 +94,7 @@ def source_from_pages(pages: Sequence[str]) -> DocumentEvidence:
     structure_is_uncertain = False
 
     for page_number, page in enumerate(pages, 1):
+        page_start = (len(headers), len(rows))
         columns: Columns | None = None
         previous_item_on_page = False
         lines = page.splitlines()
@@ -164,6 +165,8 @@ def source_from_pages(pages: Sequence[str]) -> DocumentEvidence:
                 )
             )
             previous_item_on_page = bool(cells["item id"])
+        if page_start == (len(headers), len(rows)):
+            structure_is_uncertain = True
 
     return DocumentEvidence(
         headers=tuple(headers),

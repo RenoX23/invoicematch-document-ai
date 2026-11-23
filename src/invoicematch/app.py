@@ -26,7 +26,6 @@ from invoicematch.domain import (
     OrderLine,
     PurchaseOrder,
     Reconciliation,
-    ReviewMapping,
 )
 from invoicematch.evidence import source_from_pages
 from invoicematch.model import Invocation, ModelFailure, normalize_model
@@ -41,6 +40,7 @@ from invoicematch.reconciliation import extract_rules, reconcile
 from invoicematch.storage import (
     SESSION_SECONDS,
     DecisionInput,
+    MappingInput,
     OrderInput,
     Review,
     ReviewMode,
@@ -441,7 +441,7 @@ def create_app(
     async def confirm_mapping(review_id: str, request: Request, response: Response) -> Review:
         session = await run_in_threadpool(require_session, request)
         mapping = await _json_input(
-            request, ReviewMapping, 64 * 1024, "invalid_mapping", "Enter valid item IDs."
+            request, MappingInput, 64 * 1024, "invalid_mapping", "Enter valid item IDs."
         )
         review = await run_in_threadpool(store.map_review, session, review_id, mapping)
         if review is None:

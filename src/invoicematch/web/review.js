@@ -13,7 +13,7 @@ const mappingStatus = document.getElementById("mapping-status");
 const uploadStatus = document.getElementById("upload-status");
 const decisionStatus = document.getElementById("decision-status");
 const reviewSection = document.getElementById("review");
-const reconcileButton = uploadForm.querySelector("button");
+const reconcileButton = uploadForm.querySelector("button[type=submit]");
 const saveButton = decisionForm.querySelector("button");
 const mappingButton = mappingForm.querySelector("button");
 const verdictLabels = {
@@ -22,6 +22,7 @@ const verdictLabels = {
   needs_review: "Needs review",
 };
 let reviewId = null;
+let displayedMappingRevision = 0;
 let catalog = { custom: [], samples: [], live_enabled: false };
 let editingVersion = null;
 
@@ -118,6 +119,7 @@ function describeFinding(finding) {
 
 function showReview(review) {
   reviewId = review.review_id;
+  displayedMappingRevision = review.mappings.length;
   reviewSection.hidden = false;
   const mapping = review.mappings.at(-1)?.mapping;
   const hasMapping = mapping && (mapping.confirm_supplier || Object.keys(mapping.items).length);
@@ -267,7 +269,7 @@ decisionForm.addEventListener("submit", async (event) => {
     const { data } = await request(`/api/reviews/${encodeURIComponent(reviewId)}/decisions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ decision, note }),
+      body: JSON.stringify({ decision, note, expected_mapping_revision: displayedMappingRevision }),
     });
     showReview(data);
     document.getElementById("note").value = "";
@@ -289,6 +291,7 @@ mappingForm.addEventListener("submit", async (event) => {
     const { data } = await jsonPut(`/api/reviews/${encodeURIComponent(reviewId)}/mapping`, {
       items,
       confirm_supplier: document.getElementById("confirm-supplier").checked,
+      expected_mapping_revision: displayedMappingRevision,
     });
     showReview(data);
     mappingStatus.textContent = "Mapping saved with the review.";

@@ -135,12 +135,20 @@ class MappingEvent(Contract):
     recorded_at: datetime
 
 
-class DecisionInput(Contract):
+class MappingInput(ReviewMapping):
+    expected_mapping_revision: Annotated[int, Field(strict=True, ge=0)] = 0
+
+
+class _DecisionFields(Contract):
     decision: Decision
     note: Annotated[str, StringConstraints(strip_whitespace=True, max_length=400)] | None = None
 
 
-class DecisionEvent(DecisionInput):
+class DecisionInput(_DecisionFields):
+    expected_mapping_revision: Annotated[int, Field(strict=True, ge=0)] = 0
+
+
+class DecisionEvent(_DecisionFields):
     recorded_at: datetime
     verdict: Verdict | None = None
     mapping_revision: int | None = None
@@ -432,6 +440,7 @@ class ReviewStore:
         self, session: str, pdf_hash: str, order_id: str, mode: ReviewMode
     ) -> Review | None:
         with closing(self._connect()) as connection:
+            self._require_active(connection, session)
             row = self._exact(connection, session, pdf_hash, order_id, mode)
             return self._read(connection, row) if row is not None else None
 
@@ -540,7 +549,8 @@ class ReviewStore:
                 )
             return review, True
 
-    def map_review(self, session: str, review_id: str, mapping: ReviewMapping) -> Review | None:
+    def map_review(self, session: str, review_id: str, incoming: MappingInput) -> Review | None:
+        mapping = ReviewMapping(confirm_supplier=incoming.confirm_supplier, items=incoming.items)
         with self._write() as connection:
             self._require_active(connection, session)
             row = connection.execute(
@@ -559,6 +569,12 @@ class ReviewStore:
             review = self._read(connection, row)
             if review.mappings and review.mappings[-1].mapping == mapping:
                 return review
+            if incoming.expected_mapping_revision != len(review.mappings):
+                raise StoreProblem(
+                    409,
+                    "review_version_conflict",
+                    "Reload this review before changing its mapping.",
+                )
             if len(review.mappings) >= 20:
                 raise StoreProblem(
                     429, "mapping_capacity", "This review has reached its mapping limit."
@@ -611,6 +627,12 @@ class ReviewStore:
                     429, "decision_capacity", "This review has reached its decision limit."
                 )
             review = self._read(connection, row)
+            if decision.expected_mapping_revision != len(review.mappings):
+                raise StoreProblem(
+                    409,
+                    "review_version_conflict",
+                    "Reload this review before recording a decision.",
+                )
             event = connection.execute(
                 "INSERT INTO decision_events (review_id, decision, note, recorded_at) VALUES (?, ?, ?, ?)",
                 (review_id, decision.decision, decision.note, datetime.now(UTC).isoformat()),
