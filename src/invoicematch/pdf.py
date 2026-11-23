@@ -28,6 +28,11 @@ def validate_pdf_header(data: bytes) -> None:
 
 def read_pdf_source(data: bytes) -> DocumentEvidence:
     """Read positioned text and find invoice evidence in an approved sample."""
+    return source_from_pages(read_pdf_pages(data))
+
+
+def read_pdf_pages(data: bytes) -> tuple[str, ...]:
+    """Read bounded, position-preserving text from each PDF page."""
     validate_pdf_header(data)
     pages: list[str] = []
     characters = 0
@@ -53,4 +58,4 @@ def read_pdf_source(data: bytes) -> DocumentEvidence:
         raise
     except (PyPdfError, OSError, ValueError, RecursionError) as error:
         raise PdfInputError("invalid_pdf", "The invoice PDF could not be decoded.") from error
-    return source_from_pages(pages)
+    return tuple(pages)
