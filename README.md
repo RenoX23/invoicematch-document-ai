@@ -1,8 +1,8 @@
 # InvoiceMatch
 
-InvoiceMatch is an accounts-payable review app for synthetic invoice PDFs. Choose a purchase order, inspect line-level findings with source excerpts, and save a review decision with an audit history.
+InvoiceMatch is an accounts-payable review app for text-based INR invoices. Enter a purchase order or run a bundled demo, inspect line-level findings with source excerpts, and save a decision with an audit history.
 
-**Status** — The rules-based reviewer runs locally and the Phase 2 benchmark results are available. Public deployment follows in Phase 3.
+**Status** — The expanded reviewer runs locally. The Phase 2 benchmark results are available. Final UI and public deployment follow.
 
 The benchmark will measure whether model-assisted extraction catches more discrepancies than rules-only extraction and how that affects review volume, latency, and cost. Both extractors will use the same invoice evidence, return the same typed record, and run through the same deterministic reconciliation rules.
 
@@ -12,17 +12,26 @@ The benchmark will measure whether model-assisted extraction catches more discre
 docker compose up --build
 ```
 
-Open [the local reviewer](http://127.0.0.1:8000/). Download a sample PDF from the page, choose `PO-001`, and upload the sample. Submit the clean sample twice to exercise duplicate handling. After saving a decision, reload the review page to see the history.
+Open [the local reviewer](http://127.0.0.1:8000/). For a custom review, enter a PO number, supplier, and the order's item IDs, quantities, and INR prices. Save the PO, upload the matching invoice with **Rules**, and inspect the result. If the supplier or SKU names differ, confirm their mapping below the evidence and rerun the comparison. The original extraction stays in the audit history. Editing a PO creates a new version and existing reviews retain the version they compared.
 
-Compose binds to loopback and stores reviews in a named volume. Use `INVOICEMATCH_PORT` to select a different host port. To run with an installed package instead, use `python -m uvicorn invoicematch.app:create_app --factory`.
+For the bundled flow, download a sample and choose `PO-001`. Select **Sample replay** for the recorded extraction or **Sample live AI** to call Groq. Submit the clean sample twice in the same mode to exercise duplicate handling. After saving a decision, reload the review page to see the history.
 
-The local workflow accepts the three bundled synthetic invoice files. It bounds request size and upload time. The supported layout uses positioned text, recognizable table headings, and a standalone invoice total aligned to the page text margin. A table or field the system cannot verify goes to review.
+Compose binds to loopback and stores reviews in a named volume. Use `INVOICEMATCH_PORT` to select a different host port. Compose forwards `GROQ_API_KEY` from the shell or the ignored local `.env`. With a native install, launch `python -m uvicorn invoicematch.app:create_app --factory` and put the key in the server environment to enable live mode.
+
+### Supported invoices and limits
+
+- Custom reviews support one full, digitally generated INR invoice against one PO, with positive whole-number quantities. PDFs can be up to 2 MiB and eight pages. The parser recognizes labels such as **SKU**, **Qty**, and **Unit rate** in a positioned table. It expects a standalone, left-aligned **Invoice total** or **Grand total**. Image-only scans and layouts outside the supported grammar surface as review cases.
+- The rules compare corresponding line items at exact decimal values. They check the printed subtotal when present and validate the grand total with separately stated tax, freight, and discount amounts. Tax can use one aggregate amount, a CGST/SGST pair, or IGST. Conflicting breakdowns require review. Tax amounts come from the invoice.
+- Custom PDFs run in a separate parser process with a six-second deadline. The Linux container also caps parser CPU time and virtual memory. Custom invoice text stays on the reviewer server. The reviewer saves extracted fields and evidence excerpts, the PO snapshot, and decisions. Sessions expire after 24 hours. Use **Clear session data** to delete a session early.
+- Live AI accepts only the bundled samples. The server enforces a provider deadline, suppresses concurrent repeat calls for the same review, and caps live attempts per session, per minute, and per day. Provider failure is visible in the review. Replay uses the stored sample extraction and runs without a key.
 
 ```mermaid
 flowchart LR
     Browser --> API[FastAPI reviewer]
-    API --> PDF[Approved PDF and source evidence]
+    API --> PDF[PDF evidence and saved PO version]
     PDF --> Rules[Typed extraction and exact-money checks]
+    API --> Groq[Groq for bundled samples]
+    Groq --> Rules
     Rules --> Store[SQLite review and decision history]
     Store --> API
 ```
@@ -74,11 +83,11 @@ The initial prompt produced a Groq schema rejection when it returned a row objec
 
 ## First release
 
-The app compares one digitally generated, allowlisted synthetic INR invoice against one seeded purchase order. It checks supplier identity, line IDs, quantities, unit prices, line extensions, invoice total, and currency. Values use exact decimal arithmetic. A reviewer sees expected and observed values, the source page and excerpt when available, and any evidence the system could not establish.
+The reviewer compares one digitally generated INR invoice against a seeded or user-entered purchase order. It checks supplier identity, line IDs, quantities, unit prices, line extensions, invoice total, and currency. Values use exact decimal arithmetic. A reviewer sees expected and observed values, source excerpts, and any evidence the system could not establish.
 
-The tagged public release must provide an HTTPS UI that works in a fresh browser without credentials. Visitors can upload a provided sample, select its purchase order, run a comparison, inspect the result, and record a decision. The UI exposes four labeled fixture-replay scenarios and live model extraction on at least one approved sample. Decisions survive reload, sessions are isolated, and live mode has a server-side request budget and explicit failure feedback.
+The tagged public release must provide an HTTPS UI that works in a fresh browser without credentials. Visitors can start with samples or save their own PO and reconcile an unseen, supported PDF. The UI exposes four fixture-replay scenarios and live model extraction on at least one approved sample. Decisions survive reload, sessions are isolated, and live mode has a server-side request budget and explicit failure feedback.
 
-The release scope is full-order reconciliation with digitally generated synthetic invoices. The workflow ends at a saved review decision.
+The release scope is full-order reconciliation with digitally generated INR invoices. The workflow ends at a saved review decision.
 
 ## Phases
 
@@ -87,7 +96,7 @@ The release scope is full-order reconciliation with digitally generated syntheti
 | 0. GitHub and design | Verify the dedicated public repository and committed docs. Freeze the decisions, fixtures, comparison criteria, proposed data model, and verification commands below. Obtain approval for the first implementation plan. |
 | 1. Deterministic workflow | Run all four seeded cases through the local reviewer UI. Pass exact-money, evidence, persistence, isolation, and concurrent retry checks. Verify the one-command local run. |
 | 2. Model comparison | Run a paired benchmark on held-out layouts, publish measured outcomes, and verify provider failures. Run replay tests in CI without provider credentials. |
-| 3. Public release | Tag and deploy the tested revision. Verify all four replay cases, a real provider-backed review, persisted decisions, session isolation, and live limits from the hosted app. Verify clean-clone instructions, CI, and deployment and rollback documentation. |
+| 3. Public release | Tag and deploy the tested revision. Verify an unseen custom PDF and saved PO, all four replay cases, a real provider-backed review, persisted decisions, session isolation, and live limits from the hosted app. Verify clean-clone instructions, CI, and deployment and rollback documentation. |
 | 4. Maintenance release | Reproduce a defect, add a regression test, deploy a tagged fix, and verify the hosted workflow and recovery path. |
 
 The independent Scrutiny agent reviews the exact candidate revision at each phase gate. A phase advances after required checks pass, material findings are resolved, and the verdict is recorded with the revision and evidence.

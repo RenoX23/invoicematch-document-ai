@@ -9,6 +9,7 @@ from invoicematch.domain import DocumentEvidence
 from invoicematch.evidence import source_from_pages
 
 MAX_PDF_BYTES = 256 * 1024
+MAX_CUSTOM_PDF_BYTES = 2 * 1024 * 1024
 MAX_PDF_PAGES = 8
 MAX_LAYOUT_CHARACTERS = 50_000
 
@@ -19,9 +20,9 @@ class PdfInputError(ValueError):
         super().__init__(message)
 
 
-def validate_pdf_header(data: bytes) -> None:
-    if len(data) > MAX_PDF_BYTES:
-        raise PdfInputError("pdf_too_large", "The invoice PDF exceeds 256 KiB.")
+def validate_pdf_header(data: bytes, *, max_bytes: int = MAX_PDF_BYTES) -> None:
+    if len(data) > max_bytes:
+        raise PdfInputError("pdf_too_large", "The invoice PDF exceeds the upload limit.")
     if not data.startswith(b"%PDF-"):
         raise PdfInputError("invalid_pdf", "Upload a valid PDF invoice.")
 
@@ -31,9 +32,9 @@ def read_pdf_source(data: bytes) -> DocumentEvidence:
     return source_from_pages(read_pdf_pages(data))
 
 
-def read_pdf_pages(data: bytes) -> tuple[str, ...]:
+def read_pdf_pages(data: bytes, *, max_bytes: int = MAX_PDF_BYTES) -> tuple[str, ...]:
     """Read bounded, position-preserving text from each PDF page."""
-    validate_pdf_header(data)
+    validate_pdf_header(data, max_bytes=max_bytes)
     pages: list[str] = []
     characters = 0
     try:

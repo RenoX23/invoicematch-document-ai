@@ -7,6 +7,7 @@
 !src/invoicematch/*.py
 !src/invoicematch/samples/
 !src/invoicematch/samples/*.pdf
+!src/invoicematch/samples/*.json
 !src/invoicematch/web/
 !src/invoicematch/web/*.html
 !src/invoicematch/web/*.js

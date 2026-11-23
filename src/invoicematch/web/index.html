@@ -9,7 +9,28 @@
   <body>
     <main>
       <h1>InvoiceMatch reviewer</h1>
-      <p>Local rules-based review for synthetic invoices.</p>
+      <p>Review a sample invoice or reconcile your own text-based INR PDF against a saved purchase order.</p>
+      <section aria-labelledby="purchase-heading">
+        <h2 id="purchase-heading">Your purchase order</h2>
+        <form id="order-form">
+          <p><label>PO number <input id="order-number" maxlength="64" required></label></p>
+          <p><label>Supplier name or ID <input id="supplier" maxlength="120" required></label></p>
+          <div id="order-lines"></div>
+          <button id="add-order-line" type="button">Add item</button>
+          <button type="submit">Save purchase order</button>
+          <button id="new-order" type="button">New purchase order</button>
+        </form>
+        <template id="order-line-template">
+          <fieldset>
+            <legend>Order item</legend>
+            <label>Item ID <input data-key="item_id" maxlength="64" required></label>
+            <label>Quantity <input data-key="quantity" type="number" min="1" max="1000000" step="1" required></label>
+            <label>Unit price (INR) <input data-key="unit_price" inputmode="decimal" maxlength="24" required></label>
+            <button type="button">Remove item</button>
+          </fieldset>
+        </template>
+        <p id="order-status" role="status"></p>
+      </section>
       <section aria-labelledby="invoice-heading">
         <h2 id="invoice-heading">Reconcile an invoice</h2>
         <ul>
@@ -20,7 +41,7 @@
         </ul>
         <form id="upload-form">
           <p>
-            <label for="invoice">Sample invoice PDF</label>
+            <label for="invoice">Invoice PDF</label>
             <input id="invoice" type="file" accept="application/pdf,.pdf" required>
           </p>
           <p>
@@ -28,6 +49,15 @@
             <select id="order">
               <option value="PO-001">PO-001 · Reference order</option>
               <option value="PO-002">PO-002 · Alternate order</option>
+            </select>
+            <button id="edit-order" type="button" disabled>Edit selected PO</button>
+          </p>
+          <p>
+            <label for="mode">Extraction</label>
+            <select id="mode">
+              <option value="rules">Rules</option>
+              <option value="replay">Sample replay</option>
+              <option value="live" disabled>Sample live AI</option>
             </select>
           </p>
           <button type="submit">Reconcile</button>
@@ -43,6 +73,14 @@
         <ul id="order-values"></ul>
         <h3>Invoice evidence</h3>
         <ul id="evidence"></ul>
+        <form id="mapping-form" hidden>
+          <h3>Confirm supplier and item mappings</h3>
+          <p><label><input type="checkbox" id="confirm-supplier"> <span id="supplier-mapping-label"></span></label></p>
+          <div id="item-mappings"></div>
+          <button type="submit">Save mapping</button>
+        </form>
+        <p id="mapping-status" role="status"></p>
+        <ul id="mapping-history" aria-label="Mapping history"></ul>
         <form id="decision-form">
           <p>
             <label for="decision">Decision</label>
@@ -62,6 +100,8 @@
         <h3>Decision history</h3>
         <ol id="history"></ol>
       </section>
+      <p>Custom documents use rules. The session expires after 24 hours.</p>
+      <button type="button" id="delete-session">Clear session data</button>
     </main>
   </body>
 </html>

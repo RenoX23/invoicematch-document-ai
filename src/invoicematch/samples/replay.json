@@ -1,0 +1,168 @@
+{
+  "e562765a6ad3447619c7b5b94898bf10fb80dc0fb7e359f559429886d26bddbd": {
+    "invoice_number": {
+      "value": "INV-DEMO-03",
+      "evidence": {
+        "page": 1,
+        "line": 2,
+        "excerpt": "Invoice number: INV-DEMO-03"
+      }
+    },
+    "supplier_id": {
+      "value": "SUP-001",
+      "evidence": {
+        "page": 1,
+        "line": 3,
+        "excerpt": "Supplier ID: SUP-001"
+      }
+    },
+    "currency": {
+      "value": "INR",
+      "evidence": {
+        "page": 1,
+        "line": 4,
+        "excerpt": "Currency: INR"
+      }
+    },
+    "total": {
+      "value": "1100.00",
+      "evidence": {
+        "page": 1,
+        "line": 8,
+        "excerpt": "Invoice total: 1100.00"
+      }
+    },
+    "lines": [
+      {
+        "item_id": "B-20",
+        "quantity": 2,
+        "unit_price": "50.00",
+        "total": "100.00",
+        "evidence": {
+          "page": 1,
+          "line": 7,
+          "excerpt": "B-20       2           50.00         100.00"
+        }
+      }
+    ],
+    "adjustments": {}
+  },
+  "1a5656d0b043a513cb4bd4cc819fdef7200b38ab4ec4dacbf4f9a918a056267c": {
+    "invoice_number": {
+      "value": "INV-DEMO-01",
+      "evidence": {
+        "page": 1,
+        "line": 2,
+        "excerpt": "Invoice number: INV-DEMO-01"
+      }
+    },
+    "supplier_id": {
+      "value": "SUP-001",
+      "evidence": {
+        "page": 1,
+        "line": 3,
+        "excerpt": "Supplier ID: SUP-001"
+      }
+    },
+    "currency": {
+      "value": "INR",
+      "evidence": {
+        "page": 1,
+        "line": 4,
+        "excerpt": "Currency: INR"
+      }
+    },
+    "total": {
+      "value": "1100.00",
+      "evidence": {
+        "page": 1,
+        "line": 8,
+        "excerpt": "Invoice total: 1100.00"
+      }
+    },
+    "lines": [
+      {
+        "item_id": "A-10",
+        "quantity": 10,
+        "unit_price": "100.00",
+        "total": "1000.00",
+        "evidence": {
+          "page": 1,
+          "line": 6,
+          "excerpt": "A-10       10          100.00        1000.00"
+        }
+      },
+      {
+        "item_id": "B-20",
+        "quantity": 2,
+        "unit_price": "50.00",
+        "total": "100.00",
+        "evidence": {
+          "page": 1,
+          "line": 7,
+          "excerpt": "B-20       2           50.00         100.00"
+        }
+      }
+    ],
+    "adjustments": {}
+  },
+  "5db54a2b918288f39901d67a9d5ecc33d9f825cc65251847e07656bc90c2869f": {
+    "invoice_number": {
+      "value": "INV-DEMO-02",
+      "evidence": {
+        "page": 1,
+        "line": 3,
+        "excerpt": "Invoice number: INV-DEMO-02"
+      }
+    },
+    "supplier_id": {
+      "value": "SUP-001",
+      "evidence": {
+        "page": 1,
+        "line": 2,
+        "excerpt": "Supplier ID: SUP-001"
+      }
+    },
+    "currency": {
+      "value": "INR",
+      "evidence": {
+        "page": 1,
+        "line": 4,
+        "excerpt": "Currency: INR"
+      }
+    },
+    "total": {
+      "value": "1300.00",
+      "evidence": {
+        "page": 1,
+        "line": 8,
+        "excerpt": "Invoice total: 1300.00"
+      }
+    },
+    "lines": [
+      {
+        "item_id": "A-10",
+        "quantity": 10,
+        "unit_price": "120.00",
+        "total": "1200.00",
+        "evidence": {
+          "page": 1,
+          "line": 6,
+          "excerpt": "A-10         120.00          10            1200.00"
+        }
+      },
+      {
+        "item_id": "B-20",
+        "quantity": 2,
+        "unit_price": "50.00",
+        "total": "100.00",
+        "evidence": {
+          "page": 1,
+          "line": 7,
+          "excerpt": "B-20         50.00           2             100.00"
+        }
+      }
+    ],
+    "adjustments": {}
+  }
+}

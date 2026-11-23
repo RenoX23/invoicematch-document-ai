@@ -1,6 +1,9 @@
 services:
   reviewer:
     build: .
+    environment:
+      GROQ_API_KEY: "${GROQ_API_KEY:-}"
+      INVOICEMATCH_SECURE_COOKIE: "${INVOICEMATCH_SECURE_COOKIE:-0}"
     ports:
       - "127.0.0.1:${INVOICEMATCH_PORT:-8000}:8000"
     volumes:

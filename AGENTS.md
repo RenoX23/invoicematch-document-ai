@@ -17,7 +17,7 @@ The local rules-based reviewer and Phase 2 benchmark have verification commands 
 ## Repository layout
 
 - [README.md](README.md) records the product, phase gates, and Phase 0 design.
-- `src/invoicematch/` contains the HTTP entry point, extraction, reconciliation, storage, browser assets, and demo PDFs.
+- `src/invoicematch/` contains the HTTP entry point, bounded workers, extraction, reconciliation, storage, browser assets, and demo PDFs with replay data.
 - `tests/` contains unit and HTTP integration checks. `tests/fixtures/phase2/` holds the frozen benchmark PDFs and their labels.
 - `benchmarks/` holds the live capture for reproducibility.
 - `.github/workflows/` runs tests, lint, type checking, offline replay, and the container build.
