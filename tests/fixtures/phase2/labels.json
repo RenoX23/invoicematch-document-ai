@@ -1,0 +1,287 @@
+{
+  "dataset": "phase2-heldout-v1",
+  "cases": [
+    {
+      "case_id": "H01",
+      "layout": "compact",
+      "sha256": "5380f029c5a4a73fb360182cb69d1480f94a02590a9bb7206a010f2a1941380d",
+      "expected": "match",
+      "invoice_number": "H01",
+      "supplier_id": "SUP-001",
+      "currency": "INR",
+      "total": "1100.00",
+      "lines": [
+        {
+          "item_id": "A-10",
+          "quantity": 10,
+          "unit_price": "100.00",
+          "total": "1000.00"
+        },
+        {
+          "item_id": "B-20",
+          "quantity": 2,
+          "unit_price": "50.00",
+          "total": "100.00"
+        }
+      ]
+    },
+    {
+      "case_id": "H02",
+      "layout": "compact",
+      "sha256": "a39dc722d8d6cfa0da72718fe37247fa5370e0be8b8dc8004f30bb5b7e75fe92",
+      "expected": "match",
+      "invoice_number": "H02",
+      "supplier_id": "SUP-001",
+      "currency": "INR",
+      "total": "1100.00",
+      "lines": [
+        {
+          "item_id": "B-20",
+          "quantity": 2,
+          "unit_price": "50.00",
+          "total": "100.00"
+        },
+        {
+          "item_id": "A-10",
+          "quantity": 10,
+          "unit_price": "100.00",
+          "total": "1000.00"
+        }
+      ]
+    },
+    {
+      "case_id": "H03",
+      "layout": "compact",
+      "sha256": "3dbc49a5829db5ca762269101624116aeab985de8a1571db506dc85a13ae0d94",
+      "expected": "match",
+      "invoice_number": "H03",
+      "supplier_id": "SUP-001",
+      "currency": "INR",
+      "total": "1100.00",
+      "lines": [
+        {
+          "item_id": "A-10",
+          "quantity": 10,
+          "unit_price": "100.00",
+          "total": "1000.00"
+        },
+        {
+          "item_id": "B-20",
+          "quantity": 2,
+          "unit_price": "50.00",
+          "total": "100.00"
+        }
+      ]
+    },
+    {
+      "case_id": "H04",
+      "layout": "compact",
+      "sha256": "222e24ec7fa5a75956cb40bf87183fe0f077c8e44182d7c81fee274326e03ded",
+      "expected": "mismatch",
+      "invoice_number": "H04",
+      "supplier_id": "SUP-001",
+      "currency": "INR",
+      "total": "1300.00",
+      "lines": [
+        {
+          "item_id": "A-10",
+          "quantity": 10,
+          "unit_price": "120.00",
+          "total": "1200.00"
+        },
+        {
+          "item_id": "B-20",
+          "quantity": 2,
+          "unit_price": "50.00",
+          "total": "100.00"
+        }
+      ]
+    },
+    {
+      "case_id": "H05",
+      "layout": "compact",
+      "sha256": "135b929333459bdc481f3c982b5579f2f37373e742f718e99632a5a0e0a2c840",
+      "expected": "mismatch",
+      "invoice_number": "H05",
+      "supplier_id": "SUP-001",
+      "currency": "INR",
+      "total": "1000.00",
+      "lines": [
+        {
+          "item_id": "A-10",
+          "quantity": 9,
+          "unit_price": "100.00",
+          "total": "900.00"
+        },
+        {
+          "item_id": "B-20",
+          "quantity": 2,
+          "unit_price": "50.00",
+          "total": "100.00"
+        }
+      ]
+    },
+    {
+      "case_id": "H06",
+      "layout": "compact",
+      "sha256": "360b47e6b0aaad4aba59addcfed79de614d36f695d749eb77335e216ba8b6d6c",
+      "expected": "mismatch",
+      "invoice_number": "H06",
+      "supplier_id": "SUP-001",
+      "currency": "INR",
+      "total": "1000.00",
+      "lines": [
+        {
+          "item_id": "A-10",
+          "quantity": 10,
+          "unit_price": "100.00",
+          "total": "1000.00"
+        }
+      ]
+    },
+    {
+      "case_id": "H07",
+      "layout": "wrapped",
+      "sha256": "2b2c01b41779eb4d61a242ecf2b9804a01ecac1fdaf87765b170d95eabcac438",
+      "expected": "match",
+      "invoice_number": "H07",
+      "supplier_id": "SUP-001",
+      "currency": "INR",
+      "total": "1100.00",
+      "lines": [
+        {
+          "item_id": "A-10",
+          "quantity": 10,
+          "unit_price": "100.00",
+          "total": "1000.00"
+        },
+        {
+          "item_id": "B-20",
+          "quantity": 2,
+          "unit_price": "50.00",
+          "total": "100.00"
+        }
+      ]
+    },
+    {
+      "case_id": "H08",
+      "layout": "wrapped",
+      "sha256": "e5c9a55837027a70f97bed7ae89d10977bdc128608b4f3bfc6a726408683c3c6",
+      "expected": "match",
+      "invoice_number": "H08",
+      "supplier_id": "SUP-001",
+      "currency": "INR",
+      "total": "1100.00",
+      "lines": [
+        {
+          "item_id": "A-10",
+          "quantity": 10,
+          "unit_price": "100.00",
+          "total": "1000.00"
+        },
+        {
+          "item_id": "B-20",
+          "quantity": 2,
+          "unit_price": "50.00",
+          "total": "100.00"
+        }
+      ]
+    },
+    {
+      "case_id": "H09",
+      "layout": "wrapped",
+      "sha256": "57ea40d81e7607909006af5818535daf2fef83b87bea0b84ee5efb28ea0c5388",
+      "expected": "match",
+      "invoice_number": "H09",
+      "supplier_id": "SUP-001",
+      "currency": "INR",
+      "total": "1100.00",
+      "lines": [
+        {
+          "item_id": "A-10",
+          "quantity": 10,
+          "unit_price": "100.00",
+          "total": "1000.00"
+        },
+        {
+          "item_id": "B-20",
+          "quantity": 2,
+          "unit_price": "50.00",
+          "total": "100.00"
+        }
+      ]
+    },
+    {
+      "case_id": "H10",
+      "layout": "wrapped",
+      "sha256": "4acf2184bea7b527de935a106e3ebbbc83c193e6f826e41ffca5b7132ed84abd",
+      "expected": "mismatch",
+      "invoice_number": "H10",
+      "supplier_id": "SUP-001",
+      "currency": "INR",
+      "total": "1100.00",
+      "lines": [
+        {
+          "item_id": "A-10",
+          "quantity": 10,
+          "unit_price": "105.00",
+          "total": "1050.00"
+        },
+        {
+          "item_id": "B-20",
+          "quantity": 2,
+          "unit_price": "25.00",
+          "total": "50.00"
+        }
+      ]
+    },
+    {
+      "case_id": "H11",
+      "layout": "wrapped",
+      "sha256": "5d582c2716b9d51720bb7cf19b7ace3909daa846eee19767ff3149e63ed050da",
+      "expected": "mismatch",
+      "invoice_number": "H11",
+      "supplier_id": "SUP-002",
+      "currency": "INR",
+      "total": "1100.00",
+      "lines": [
+        {
+          "item_id": "A-10",
+          "quantity": 10,
+          "unit_price": "100.00",
+          "total": "1000.00"
+        },
+        {
+          "item_id": "B-20",
+          "quantity": 2,
+          "unit_price": "50.00",
+          "total": "100.00"
+        }
+      ]
+    },
+    {
+      "case_id": "H12",
+      "layout": "wrapped",
+      "sha256": "a459e440cde6666b52be5fe7a7f722f50821faff7b99fd10ea414f0745f42731",
+      "expected": "mismatch",
+      "invoice_number": "H12",
+      "supplier_id": "SUP-001",
+      "currency": "INR",
+      "total": "1150.00",
+      "lines": [
+        {
+          "item_id": "A-10",
+          "quantity": 10,
+          "unit_price": "100.00",
+          "total": "1000.00"
+        },
+        {
+          "item_id": "B-20",
+          "quantity": 2,
+          "unit_price": "50.00",
+          "total": "100.00"
+        }
+      ]
+    }
+  ]
+}

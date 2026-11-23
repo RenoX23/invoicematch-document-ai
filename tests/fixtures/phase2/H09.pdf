@@ -1,0 +1,116 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<<
+/Producer (pypdf)
+>>
+endobj
+2 0 obj
+<<
+/Type /Pages
+/Count 2
+/Kids [ 4 0 R 7 0 R ]
+>>
+endobj
+3 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
+4 0 obj
+<<
+/Type /Page
+/MediaBox [ 0 0 612 792 ]
+/Resources <<
+/Font <<
+/F1 5 0 R
+>>
+>>
+/Contents 6 0 R
+/Parent 2 0 R
+>>
+endobj
+5 0 obj
+<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Courier
+>>
+endobj
+6 0 obj
+<<
+/Length 341
+>>
+stream
+BT /F1 11 Tf 72 755 Td 17 TL
+(SYNTHETIC INVOICE) Tj T*
+() Tj T*
+(Invoice number: H09) Tj T*
+(Supplier ID: SUP-001) Tj T*
+(Currency: INR) Tj T*
+() Tj T*
+(Item ID   Description              Line total  Unit price  Quantity) Tj T*
+(A-10      Reference supply A-10    1000.00     100.00      10) Tj T*
+(          Packaged for dispatch) Tj T*
+ET
+
+endstream
+endobj
+7 0 obj
+<<
+/Type /Page
+/MediaBox [ 0 0 612 792 ]
+/Resources <<
+/Font <<
+/F1 8 0 R
+>>
+>>
+/Contents 9 0 R
+/Parent 2 0 R
+>>
+endobj
+8 0 obj
+<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Courier
+>>
+endobj
+9 0 obj
+<<
+/Length 283
+>>
+stream
+BT /F1 11 Tf 72 755 Td 17 TL
+(SYNTHETIC INVOICE) Tj T*
+() Tj T*
+(Item ID   Description              Line total  Unit price  Quantity) Tj T*
+(B-20      Reference supply B-20    100.00      50.00       2) Tj T*
+(          Packaged for dispatch) Tj T*
+(Invoice total: 1100.00) Tj T*
+ET
+
+endstream
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000015 00000 n 
+0000000054 00000 n 
+0000000119 00000 n 
+0000000168 00000 n 
+0000000296 00000 n 
+0000000364 00000 n 
+0000000756 00000 n 
+0000000884 00000 n 
+0000000952 00000 n 
+trailer
+<<
+/Size 10
+/Root 3 0 R
+/Info 1 0 R
+>>
+startxref
+1286
+%%EOF
