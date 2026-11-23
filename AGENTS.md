@@ -2,7 +2,7 @@
 
 ## Commands
 
-Phase 1 contains the local rules-based reviewer. See the README for the [local workflow](README.md#run-the-local-reviewer) and verification commands.
+The local rules-based reviewer and Phase 2 benchmark have verification commands in the README. See the [local workflow](README.md#run-the-local-reviewer) and [paired benchmark](README.md#paired-extraction-benchmark).
 
 | Task | Command |
 | --- | --- |
@@ -12,13 +12,15 @@ Phase 1 contains the local rules-based reviewer. See the README for the [local w
 | Lint and format check | `python -m ruff check .` and `python -m ruff format --check .` |
 | Type-check | `python -m mypy src` |
 | Build | `docker compose build` |
+| Replay the benchmark | `python -m invoicematch.benchmark --mode replay --capture benchmarks/phase2-groq.json` |
 
 ## Repository layout
 
 - [README.md](README.md) records the product, phase gates, and Phase 0 design.
 - `src/invoicematch/` contains the HTTP entry point, extraction, reconciliation, storage, browser assets, and demo PDFs.
-- `tests/` contains unit and HTTP integration checks. `tests/fixtures/` is the planned home for the held-out benchmark fixtures.
-- `.github/workflows/` runs tests, lint, type checking, and the container build.
+- `tests/` contains unit and HTTP integration checks. `tests/fixtures/phase2/` holds the frozen benchmark PDFs and their labels.
+- `benchmarks/` holds the live capture for reproducibility.
+- `.github/workflows/` runs tests, lint, type checking, offline replay, and the container build.
 
 ## Conventions
 

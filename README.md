@@ -2,7 +2,7 @@
 
 InvoiceMatch is an accounts-payable review app for synthetic invoice PDFs. Choose a purchase order, inspect line-level findings with source excerpts, and save a review decision with an audit history.
 
-**Status** — Phase 1 local workflow in review. The rules-based reviewer and bundled demo samples run locally. The model benchmark and public deployment are later phases.
+**Status** — The rules-based reviewer runs locally and the Phase 2 benchmark results are available. Public deployment follows in Phase 3.
 
 The benchmark will measure whether model-assisted extraction catches more discrepancies than rules-only extraction and how that affects review volume, latency, and cost. Both extractors will use the same invoice evidence, return the same typed record, and run through the same deterministic reconciliation rules.
 
@@ -42,6 +42,35 @@ python -m mypy src
 Use `docker compose build` to verify the image. The test suite checks the matching policy, source row evidence, API boundaries, session isolation, and concurrent retries through the upload endpoint.
 
 The sample generator runs with `python scripts/generate_demo_fixtures.py`. It produces the clean-match, price-mismatch, and ambiguous-extraction PDFs. The duplicate scenario reuses the clean-match bytes.
+
+## Paired extraction benchmark
+
+The held-out set contains 12 synthetic PDFs across two layouts, with six valid invoices and six discrepancies. [Frozen labels and PDF hashes](tests/fixtures/phase2/labels.json) tie the expected decisions and fields to each input. Groq receives positioned invoice text. Both arms use the same source verifier, typed extraction contract, and reconciliation policy.
+
+```shell
+python -m invoicematch.benchmark --mode rules
+python -m invoicematch.benchmark --mode replay --capture benchmarks/phase2-groq.json
+python -m invoicematch.benchmark --mode groq --output instance/phase2-groq-live.json
+```
+
+Rules and replay run offline. Replay checks that the recorded claims reproduce the same decisions and field scores. The live command uses `GROQ_API_KEY` from the environment or the ignored local `.env`. It sends one request per case with ten seconds between calls by default. Reported latency starts after shared PDF parsing and evidence preparation, and excludes this pacing delay. It includes extraction and reconciliation, plus the provider round trip for the model arm.
+
+### Observed results
+
+| Metric | Rules | Groq GPT-OSS 20B |
+| --- | ---: | ---: |
+| Discrepancies marked as matches | 0/6 | 0/6 |
+| Valid invoices that failed to match | 0/6 | 0/6 |
+| Invoices routed to review | 0/12 | 0/12 |
+| Exact labeled fields | 140/140 | 140/140 |
+| Technical failures | 0/12 | 0/12 |
+| Median latency | 0.16 ms | 0.79 s |
+
+Groq's nearest-rank p95 was **1.26 s**. All 12 calls reported usage, totaling 8,719 input and 2,949 output tokens. Estimated list-price cost was **$0.00144** for the run, or **$0.00012 per invoice**. The capture records the measured source commit `cd04162`, prompt version, request parameters, protocol hash, backend fingerprints, token usage, and individual decisions. [Live capture](benchmarks/phase2-groq.json) · [Groq model pricing](https://console.groq.com/docs/model/openai/gpt-oss-20b)
+
+The two arms agreed on all 12 cases, so rules remain the default. The corpus is small and synthetic. Both arms rely on the same deterministic source verifier, which already identifies and checks the values for these layouts. These timings describe the benchmark machine and network path. Hosted UI request times require a separate measurement.
+
+The initial prompt produced a Groq schema rejection when it returned a row object in place of the required array. The revised prompt clarifies the shape, and the benchmark counts a provider schema rejection as a technical failure. A separate regression verifies that a plausible price taken from a neighboring row on H03 routes to review.
 
 ## First release
 

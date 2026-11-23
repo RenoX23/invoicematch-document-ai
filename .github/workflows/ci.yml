@@ -27,5 +27,9 @@ jobs:
         run: python -m mypy src
       - name: Test
         run: python -m pytest
+      - name: Verify the captured model responses offline
+        env:
+          GROQ_API_KEY: ""
+        run: python -m invoicematch.benchmark --mode replay --capture benchmarks/phase2-groq.json
       - name: Build the local reviewer image
         run: docker compose build
