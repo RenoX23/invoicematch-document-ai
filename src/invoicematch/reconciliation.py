@@ -8,6 +8,7 @@ from typing import TypeVar
 from pydantic import ValidationError
 
 from invoicematch.domain import (
+    ADJUSTMENTS,
     Claim,
     Currency,
     DocumentEvidence,
@@ -19,7 +20,9 @@ from invoicematch.domain import (
     Money,
     PurchaseOrder,
     Reconciliation,
+    ReviewMapping,
     SourceRow,
+    Supplier,
 )
 
 T = TypeVar("T")
@@ -59,10 +62,15 @@ def extract_rules(document: DocumentEvidence) -> InvoiceExtraction:
     lines = tuple(line for row in document.rows if (line := _source_line(row)) is not None)
     return InvoiceExtraction(
         invoice_number=_source_claim(document, "invoice_number", Claim[Identifier]),
-        supplier_id=_source_claim(document, "supplier_id", Claim[Identifier]),
+        supplier_id=_source_claim(document, "supplier_id", Claim[Supplier]),
         currency=_source_claim(document, "currency", Claim[Currency]),
         total=_source_claim(document, "total", Claim[Money]),
         lines=lines,
+        adjustments={
+            name: claim
+            for name in ADJUSTMENTS
+            if (claim := _source_claim(document, name, Claim[Money])) is not None
+        },
     )
 
 
@@ -77,13 +85,18 @@ def _uncertain_evidence(document: DocumentEvidence, candidate: InvoiceExtraction
         (
             "supplier_id",
             candidate.supplier_id,
-            _source_claim(document, "supplier_id", Claim[Identifier]),
+            _source_claim(document, "supplier_id", Claim[Supplier]),
         ),
         ("currency", candidate.currency, currency_source),
         ("total", candidate.total, _source_claim(document, "total", Claim[Money])),
     )
     findings: list[Finding] = []
-    for field, claimed, source in grounded_headers:
+    adjustments = (
+        (name, candidate.adjustments.get(name), _source_claim(document, name, Claim[Money]))
+        for name in ADJUSTMENTS
+        if name in candidate.adjustments or any(field.name == name for field in document.headers)
+    )
+    for field, claimed, source in (*grounded_headers, *adjustments):
         if source is not None and claimed == source:
             continue
         source_fields = [header for header in document.headers if header.name == field]
@@ -116,6 +129,14 @@ def _uncertain_evidence(document: DocumentEvidence, candidate: InvoiceExtraction
 
     if not document.complete_table or not document.rows:
         findings.append(Finding(code="incomplete_table", field="lines"))
+    keys = candidate.adjustments.keys()
+    has_split_tax = bool(keys & {"cgst", "sgst"})
+    if (
+        (keys & {"tax", "igst"} and has_split_tax)
+        or {"tax", "igst"} <= keys
+        or (has_split_tax and not {"cgst", "sgst"} <= keys)
+    ):
+        findings.append(Finding(code="ambiguous_tax_components", field="tax"))
 
     source_rows = {row.evidence: row for row in document.rows}
     claimed_rows = Counter(line.evidence for line in candidate.lines)
@@ -157,8 +178,27 @@ def _uncertain_evidence(document: DocumentEvidence, candidate: InvoiceExtraction
     return findings
 
 
+def validate_mapping(
+    order: PurchaseOrder, candidate: InvoiceExtraction, mapping: ReviewMapping
+) -> None:
+    invoice_ids = {line.item_id for line in candidate.lines}
+    order_ids = {line.item_id for line in order.lines}
+    chosen = {mapping.items.get(item, item) for item in invoice_ids}
+    if (
+        mapping.items.keys() - invoice_ids
+        or set(mapping.items.values()) - order_ids
+        or len(chosen) != len(invoice_ids)
+    ):
+        raise ValueError("Use existing invoice and PO items and map each PO item at most once.")
+    if mapping.confirm_supplier and candidate.supplier_id is None:
+        raise ValueError("A supplier must be present in the invoice evidence.")
+
+
 def reconcile(
-    order: PurchaseOrder, document: DocumentEvidence, candidate: InvoiceExtraction
+    order: PurchaseOrder,
+    document: DocumentEvidence,
+    candidate: InvoiceExtraction,
+    mapping: ReviewMapping | None = None,
 ) -> Reconciliation:
     uncertainty = _uncertain_evidence(document, candidate)
     if uncertainty:
@@ -168,7 +208,10 @@ def reconcile(
     assert candidate.supplier_id is not None
     assert candidate.total is not None
     findings: list[Finding] = []
-    if candidate.supplier_id.value != order.supplier_id:
+    if (
+        candidate.supplier_id.value.casefold().split() != order.supplier_id.casefold().split()
+        and not (mapping and mapping.confirm_supplier)
+    ):
         findings.append(
             Finding(
                 code="supplier_mismatch",
@@ -180,7 +223,8 @@ def reconcile(
         )
 
     order_lines = {line.item_id: line for line in order.lines}
-    invoice_ids = {line.item_id for line in candidate.lines}
+    item_map = mapping.items if mapping else {}
+    invoice_ids = {item_map.get(line.item_id, line.item_id) for line in candidate.lines}
     for item_id in order_lines:
         if item_id not in invoice_ids:
             findings.append(
@@ -195,7 +239,7 @@ def reconcile(
     with localcontext(Context(prec=32)):
         computed_total = Decimal(0)
         for line in candidate.lines:
-            expected_line = order_lines.get(line.item_id)
+            expected_line = order_lines.get(item_map.get(line.item_id, line.item_id))
             if expected_line is None:
                 findings.append(
                     Finding(
@@ -234,6 +278,22 @@ def reconcile(
                         evidence=line.evidence,
                     )
                 )
+
+        adjustments = candidate.adjustments
+        subtotal = adjustments.get("subtotal")
+        if subtotal and subtotal.value != computed_total:
+            findings.append(
+                Finding(
+                    code="invoice_subtotal_mismatch",
+                    field="subtotal",
+                    expected=str(computed_total),
+                    observed=str(subtotal.value),
+                    evidence=subtotal.evidence,
+                )
+            )
+        for name, claim in adjustments.items():
+            if name != "subtotal":
+                computed_total += -claim.value if name == "discount" else claim.value
 
     if computed_total != candidate.total.value:
         findings.append(
