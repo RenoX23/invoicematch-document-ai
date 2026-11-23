@@ -1,10 +1,47 @@
 # InvoiceMatch
 
-InvoiceMatch is a planned accounts-payable review app. The reviewer workflow covers synthetic invoice upload, purchase-order selection, line-level findings with source excerpts, and a saved decision with an audit history.
+InvoiceMatch is an accounts-payable review app for synthetic invoice PDFs. Choose a purchase order, inspect line-level findings with source excerpts, and save a review decision with an audit history.
 
-**Status** — Phase 0 design. The public demo, benchmark, and application checks are planned.
+**Status** — Phase 1 local workflow in review. The rules-based reviewer and bundled demo samples run locally. The model benchmark and public deployment are later phases.
 
 The benchmark will measure whether model-assisted extraction catches more discrepancies than rules-only extraction and how that affects review volume, latency, and cost. Both extractors will use the same invoice evidence, return the same typed record, and run through the same deterministic reconciliation rules.
+
+## Run the local reviewer
+
+```shell
+docker compose up --build
+```
+
+Open [the local reviewer](http://127.0.0.1:8000/). Download a sample PDF from the page, choose `PO-001`, and upload the sample. Submit the clean sample twice to exercise duplicate handling. After saving a decision, reload the review page to see the history.
+
+Compose binds to loopback and stores reviews in a named volume. Use `INVOICEMATCH_PORT` to select a different host port. To run with an installed package instead, use `python -m uvicorn invoicematch.app:create_app --factory`.
+
+The local workflow accepts the three bundled synthetic invoice files. It bounds request size and upload time. The input format is positioned invoice text with recognizable table headings. A table or field the system cannot verify goes to review.
+
+```mermaid
+flowchart LR
+    Browser --> API[FastAPI reviewer]
+    API --> PDF[Approved PDF and source evidence]
+    PDF --> Rules[Typed extraction and exact-money checks]
+    Rules --> Store[SQLite review and decision history]
+    Store --> API
+```
+
+## Verify the local workflow
+
+In an activated Python 3.11+ virtual environment, run:
+
+```shell
+python -m pip install -e ".[dev]"
+python -m pytest
+python -m ruff check .
+python -m ruff format --check .
+python -m mypy src
+```
+
+Use `docker compose build` to verify the image. The test suite checks the matching policy, source row evidence, API boundaries, session isolation, and concurrent retries through the upload endpoint.
+
+The sample generator runs with `python scripts/generate_demo_fixtures.py`. It produces the clean-match, price-mismatch, and ambiguous-extraction PDFs. The duplicate scenario reuses the clean-match bytes.
 
 ## First release
 

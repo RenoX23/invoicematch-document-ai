@@ -2,9 +2,9 @@
 
 ## Commands
 
-The repository is in Phase 0. The commands below are proposed for Phase 1 and become verified when run on a clean checkout.
+Phase 1 contains the local rules-based reviewer. See the README for the [local workflow](README.md#run-the-local-reviewer) and verification commands.
 
-| Task | Proposed command |
+| Task | Command |
 | --- | --- |
 | Setup | Create a Python 3.11+ virtual environment, activate it, and run `python -m pip install -e ".[dev]"`. |
 | Run | `docker compose up --build` |
@@ -16,9 +16,9 @@ The repository is in Phase 0. The commands below are proposed for Phase 1 and be
 ## Repository layout
 
 - [README.md](README.md) records the product, phase gates, and Phase 0 design.
-- `src/invoicematch/` is the proposed application package for the HTTP entry point, extraction, reconciliation, and persistence.
-- `tests/` is the proposed verification suite. `tests/fixtures/` will hold versioned synthetic inputs and expected outcomes.
-- `.github/workflows/` will contain CI when the first runnable checks land.
+- `src/invoicematch/` contains the HTTP entry point, extraction, reconciliation, storage, browser assets, and demo PDFs.
+- `tests/` contains unit and HTTP integration checks. `tests/fixtures/` is the planned home for the held-out benchmark fixtures.
+- `.github/workflows/` runs tests, lint, type checking, and the container build.
 
 ## Conventions
 
