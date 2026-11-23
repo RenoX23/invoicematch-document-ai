@@ -92,6 +92,13 @@ def test_api_timeout_is_a_provider_failure(monkeypatch: pytest.MonkeyPatch) -> N
     assert invoke_groq(_pages(), "synthetic-test-key").error == "provider_timeout"
 
 
+def test_schema_rejection_differs_from_invalid_request() -> None:
+    response = b'{"error":{"code":"json_validate_failed","failed_generation":"untrusted text"}}'
+    assert model._provider_error_code(400, response) == "provider_schema_failure"
+    assert model._provider_error_code(400, b'{"error":{"code":"bad_schema"}}') == "groq_http_400"
+    assert model._provider_error_code(429, response) == "groq_http_429"
+
+
 @pytest.mark.parametrize(
     ("message", "finish_reason", "code"),
     [

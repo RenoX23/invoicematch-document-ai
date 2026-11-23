@@ -231,14 +231,19 @@ def summarize(report: Report) -> dict[str, object]:
             if case.invocation and case.invocation.usage
         ]
         cost = sum((usage.list_price_usd() for usage in usages), Decimal(0))
-        summary["model_latency_ms_median"] = median(latency)
-        summary["model_latency_ms_p95_nearest_rank"] = latency[math.ceil(len(latency) * 0.95) - 1]
+        summary["model_latency_ms_median"] = median(latency) if latency else None
+        summary["model_latency_ms_p95_nearest_rank"] = (
+            latency[math.ceil(len(latency) * 0.95) - 1] if latency else None
+        )
         summary["input_tokens"] = sum(usage.prompt_tokens for usage in usages)
         summary["output_tokens"] = sum(usage.completion_tokens for usage in usages)
-        summary["estimated_cost_usd"] = str(cost)
+        summary["estimated_cost_usd"] = str(cost) if usages else None
         summary["calls_with_usage"] = len(usages)
+        summary["usage_complete"] = len(usages) == len(report.cases) == 12
         summary["prefer_model"] = (
-            all(not run.technical_error for run in model_runs)
+            len(model_runs) == len(report.cases) == 12
+            and all(not run.technical_error for run in model_runs)
+            and all(not case.rules.technical_error for case in report.cases)
             and sum(
                 case.model is not None
                 and case.model.verdict == "match"
