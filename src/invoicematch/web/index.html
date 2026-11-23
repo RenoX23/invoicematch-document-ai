@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>InvoiceMatch reviewer</title>
+    <script src="/review.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <h1>InvoiceMatch reviewer</h1>
+      <p>Local rules-based review for synthetic invoices.</p>
+      <section aria-labelledby="invoice-heading">
+        <h2 id="invoice-heading">Reconcile an invoice</h2>
+        <ul>
+          <li><a href="/samples/clean-match.pdf">Clean match PDF</a></li>
+          <li><a href="/samples/price-mismatch.pdf">Price mismatch PDF</a></li>
+          <li><a href="/samples/ambiguous-extraction.pdf">Ambiguous extraction PDF</a></li>
+          <li>For the duplicate scenario, submit the clean match PDF twice.</li>
+        </ul>
+        <form id="upload-form">
+          <p>
+            <label for="invoice">Sample invoice PDF</label>
+            <input id="invoice" type="file" accept="application/pdf,.pdf" required>
+          </p>
+          <p>
+            <label for="order">Purchase order</label>
+            <select id="order">
+              <option value="PO-001">PO-001 · Reference order</option>
+              <option value="PO-002">PO-002 · Alternate order</option>
+            </select>
+          </p>
+          <button type="submit">Reconcile</button>
+        </form>
+        <p id="upload-status" role="status"></p>
+      </section>
+      <section id="review" aria-labelledby="review-heading" hidden>
+        <h2 id="review-heading">Review</h2>
+        <p id="review-verdict"></p>
+        <h3>Findings</h3>
+        <ul id="findings"></ul>
+        <h3>Purchase order</h3>
+        <ul id="order-values"></ul>
+        <h3>Invoice evidence</h3>
+        <ul id="evidence"></ul>
+        <form id="decision-form">
+          <p>
+            <label for="decision">Decision</label>
+            <select id="decision">
+              <option value="accept">Accept</option>
+              <option value="reject">Reject</option>
+              <option value="hold">Hold</option>
+            </select>
+          </p>
+          <p>
+            <label for="note">Note (optional)</label>
+            <input id="note" type="text" maxlength="400">
+          </p>
+          <button type="submit">Save decision</button>
+        </form>
+        <p id="decision-status" role="status"></p>
+        <h3>Decision history</h3>
+        <ol id="history"></ol>
+      </section>
+    </main>
+  </body>
+</html>
