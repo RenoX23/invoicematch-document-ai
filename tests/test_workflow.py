@@ -50,6 +50,23 @@ async def _submit(client: AsyncClient, data: bytes, order_id: str = "PO-001") ->
     )
 
 
+async def test_reviewer_serves_its_assets_under_the_same_origin(tmp_path: Path) -> None:
+    async with _client(tmp_path / "reviews.sqlite3") as client:
+        page = await client.get("/")
+        assert "default-src 'self'" in page.headers["content-security-policy"]
+        for path, content_type in (
+            ("/review.css", "text/css"),
+            ("/review.js", "text/javascript"),
+            ("/instrument-sans.woff2", "font/woff2"),
+            ("/favicon.png", "image/png"),
+        ):
+            assert f'"{path}"' in page.text
+            asset = await client.get(path)
+            assert asset.status_code == 200
+            assert asset.headers["content-type"].split(";")[0] == content_type
+            assert asset.content
+
+
 @pytest.mark.parametrize(
     ("filename", "verdict"),
     [
@@ -62,7 +79,7 @@ async def test_normal_upload_path(tmp_path: Path, filename: str, verdict: str) -
     database = tmp_path / "reviews.sqlite3"
     async with _client(database) as client:
         assert (await client.get("/health")).json() == {"status": "ok"}
-        assert "Reconcile an invoice" in (await client.get("/")).text
+        assert "Check an invoice against a purchase order" in (await client.get("/")).text
         pdf = await client.get(f"/samples/{filename}")
         assert pdf.content == _sample(filename)
         response = await _submit(client, pdf.content)

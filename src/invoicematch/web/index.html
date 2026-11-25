@@ -3,105 +3,214 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>InvoiceMatch reviewer</title>
+    <meta name="description" content="Compare an invoice with a purchase order, see where they differ, and record a decision.">
+    <title>InvoiceMatch — Invoice review</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="preload" href="/instrument-sans.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="/review.css">
     <script src="/review.js" defer></script>
   </head>
   <body>
-    <main>
-      <h1>InvoiceMatch reviewer</h1>
-      <p>Review a sample invoice or reconcile your own text-based INR PDF against a saved purchase order.</p>
-      <section aria-labelledby="purchase-heading">
-        <h2 id="purchase-heading">Your purchase order</h2>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="/" aria-label="InvoiceMatch home"><span class="brand-mark" aria-hidden="true"></span>InvoiceMatch</a>
+        <div class="top-actions">
+          <button class="quiet" id="open-help" type="button">Help</button>
+          <button class="theme-switch" id="theme-switch" type="button" aria-pressed="false" aria-label="Dark theme"><span aria-hidden="true">◐</span></button>
+        </div>
+      </div>
+    </header>
+    <div class="workspace">
+      <aside class="rail">
+        <nav aria-label="Workspace">
+          <button class="rail-link" id="review-nav" type="button" aria-current="page"><span class="nav-symbol" aria-hidden="true">≡</span><span>Invoice review</span></button>
+          <button class="rail-link" id="manage-orders" type="button"><span class="nav-symbol order-symbol" aria-hidden="true">▤</span><span>Purchase orders</span></button>
+        </nav>
+      </aside>
+      <main id="main" tabindex="-1">
+        <p id="session-status" class="notice" role="status" hidden></p>
+        <section id="setup" aria-labelledby="setup-title">
+          <div class="intro">
+            <div class="intro-copy">
+              <h1 id="setup-title" tabindex="-1">Check an invoice against a purchase order</h1>
+              <p>See what matches, trace differences to the invoice, and record your decision.</p>
+            </div>
+            <aside class="worked-example" aria-label="Example of an invoice finding">
+              <div class="example-heading"><span>Sample finding</span><span class="example-id">A-10</span></div>
+              <strong>Unit price differs</strong>
+              <dl><div><dt>Ordered</dt><dd>₹100.00</dd></div><div><dt>Billed</dt><dd>₹120.00</dd></div></dl>
+              <p>Invoice evidence · Page 1</p>
+            </aside>
+          </div>
+          <section class="panel setup-panel" aria-labelledby="start-title">
+            <div class="panel-heading">
+              <div><h2 id="start-title">Start a review</h2><p>Choose your documents or open a ready-to-run sample.</p></div>
+              <div class="segmented" role="group" aria-label="Review type">
+                <button id="custom-path" type="button" aria-pressed="true">Check my invoice</button>
+                <button id="sample-path" type="button" aria-pressed="false">Try a sample</button>
+              </div>
+            </div>
+            <form id="upload-form">
+              <fieldset id="upload-fields" class="unboxed" disabled>
+                <div id="custom-inputs" class="setup-grid">
+                  <section class="file-step" aria-labelledby="file-heading">
+                    <h3 id="file-heading">Invoice PDF</h3>
+                    <label class="drop-area" id="drop-area">
+                      <span class="file-symbol" aria-hidden="true">↑</span>
+                      <span><strong id="file-name">Choose a PDF</strong><span id="file-prompt">or drop it here</span></span>
+                      <input id="invoice" type="file" accept="application/pdf,.pdf" aria-describedby="file-hint">
+                    </label>
+                    <p id="file-hint" class="hint">Text-based INR invoice · Up to 2 MiB and 8 pages</p>
+                  </section>
+                  <section class="order-step" aria-labelledby="order-heading">
+                    <h3 id="order-heading"><label for="order">Purchase order</label></h3>
+                    <select id="order"></select>
+                    <div class="button-row order-actions">
+                      <button class="text-button" id="new-order" type="button">+ New purchase order</button>
+                      <button class="text-button" id="edit-order" type="button" disabled>Edit selected order</button>
+                    </div>
+                    <p class="hint" id="order-hint">Save the supplier, item codes, quantities, and unit prices.</p>
+                  </section>
+                </div>
+                <div id="sample-inputs" hidden>
+                  <fieldset class="unboxed sample-group">
+                    <legend>Sample invoice</legend>
+                    <div class="sample-grid">
+                      <label class="sample-option"><input type="radio" name="sample" value="clean-match" checked><span><strong>Clean match</strong><span>Prices and quantities agree.</span></span></label>
+                      <label class="sample-option"><input type="radio" name="sample" value="price-mismatch"><span><strong>Price mismatch</strong><span>An item bills above the order price.</span></span></label>
+                      <label class="sample-option"><input type="radio" name="sample" value="ambiguous-extraction"><span><strong>Needs review</strong><span>One unit price is unclear.</span></span></label>
+                      <label class="sample-option"><input type="radio" name="sample" value="duplicate"><span><strong>Duplicate upload</strong><span>Run the same PDF twice.</span></span></label>
+                    </div>
+                  </fieldset>
+                  <p class="hint sample-links"><a id="download-sample" href="/samples/clean-match.pdf">Download sample PDF</a><span>Purchase order PO-001 is included.</span></p>
+                  <details class="sample-settings">
+                    <summary>Sample options</summary>
+                    <label class="field">Read the sample using
+                      <select id="mode" aria-describedby="mode-hint">
+                        <option value="replay">Sample replay</option>
+                        <option value="rules">Local rules</option>
+                        <option value="live" disabled>Live AI</option>
+                      </select>
+                    </label>
+                    <p class="hint" id="mode-hint">Replay uses a saved reading of the sample. Live AI reads the bundled PDF on demand.</p>
+                  </details>
+                </div>
+                <div class="submit-bar">
+                  <button class="primary" type="submit">Compare invoice <span aria-hidden="true">→</span></button>
+                  <p id="upload-status" class="status" role="status" aria-live="polite"></p>
+                </div>
+              </fieldset>
+            </form>
+          </section>
+        </section>
+        <section id="review" aria-labelledby="review-title" hidden>
+          <div class="review-top">
+            <div><p id="review-context" class="review-context"></p><h1 id="review-title" tabindex="-1">Invoice review</h1></div>
+            <button class="secondary" id="new-review" type="button">New review <span aria-hidden="true">↗</span></button>
+          </div>
+          <div class="verdict-band" id="verdict-band">
+            <span class="badge" id="review-verdict"></span>
+            <p id="review-summary"></p>
+            <p id="review-note" class="hint" hidden></p>
+            <button class="text-button" id="review-mapping" type="button" hidden>Confirm supplier or item names</button>
+          </div>
+          <div class="review-layout">
+            <section class="panel comparison" aria-labelledby="comparison-title">
+              <div class="section-heading"><h2 id="comparison-title">Comparison</h2><p id="order-context"></p></div>
+              <div class="table-wrap" role="region" aria-label="Invoice comparison" tabindex="0">
+                <table>
+                  <thead><tr><th scope="col">Field or item</th><th scope="col">Expected</th><th scope="col">On invoice</th><th scope="col">Result</th></tr></thead>
+                  <tbody id="findings"></tbody>
+                </table>
+              </div>
+              <details class="line-details" id="order-details">
+                <summary>Purchase order items</summary>
+                <ul class="order-values" id="order-values"></ul>
+              </details>
+            </section>
+            <aside class="panel evidence" id="evidence-panel" aria-labelledby="evidence-title">
+              <div class="section-heading"><h2 id="evidence-title" tabindex="-1">Invoice evidence</h2><p>Excerpts from the uploaded PDF.</p></div>
+              <div class="evidence-inner">
+                <div id="active-source"></div>
+                <label id="source-label" class="field" for="source-picker">Browse excerpts</label>
+                <select id="source-picker"></select>
+              </div>
+            </aside>
+          </div>
+          <details class="panel mapping-panel" id="mapping-panel" hidden>
+            <summary>Confirm supplier and item names</summary>
+            <form id="mapping-form">
+              <p class="hint">Confirm names that refer to the same supplier or item. The original invoice evidence is saved.</p>
+              <label class="check-field"><input type="checkbox" id="confirm-supplier"><span id="supplier-mapping-label"></span></label>
+              <div id="item-mappings" class="field-grid"></div>
+              <div class="button-row mapping-actions"><button class="secondary" type="submit">Save and compare again</button><p id="mapping-status" class="status" role="status"></p></div>
+              <ul class="history" id="mapping-history" aria-label="Mapping history"></ul>
+            </form>
+          </details>
+          <section class="panel decision-panel" aria-labelledby="decision-title">
+            <div class="section-heading"><h2 id="decision-title">Your decision</h2><p>Record what should happen to this invoice.</p></div>
+            <form id="decision-form" class="decision-form">
+              <label class="field">Decision
+                <select id="decision" required>
+                  <option value="" disabled selected>Choose a decision</option>
+                  <option value="accept">Accept</option>
+                  <option value="reject">Reject</option>
+                  <option value="hold">Hold</option>
+                </select>
+              </label>
+              <label class="field">Note <span class="optional">(optional)</span><input id="note" type="text" maxlength="400" placeholder="Add context for the next reviewer"></label>
+              <button class="primary" type="submit">Save decision</button>
+              <p id="decision-status" class="status" role="status"></p>
+            </form>
+            <div class="history-block"><h3>Decision history</h3><ol class="history" id="history"></ol></div>
+          </section>
+        </section>
+        <noscript><p class="notice">Enable JavaScript to upload a PDF and compare it with a purchase order.</p></noscript>
+      </main>
+      <footer class="session-note">
+        <span class="session-label">Private session</span>
+        <p>Saved orders and reviews expire after 24 hours.</p>
+        <button class="text-button" id="delete-session" type="button">Clear session data</button>
+      </footer>
+    </div>
+    <dialog id="order-dialog" aria-labelledby="order-title">
+      <div class="dialog-inner">
+        <div class="dialog-heading"><div><h2 id="order-title">Purchase orders</h2><p>Save an order here, then select it in a review.</p></div><button class="icon-button" id="close-order" type="button" aria-label="Close purchase orders">×</button></div>
+        <label class="field" id="catalog-label" hidden>Edit a saved order<select id="saved-orders"></select></label>
         <form id="order-form">
-          <p><label>PO number <input id="order-number" maxlength="64" required></label></p>
-          <p><label>Supplier name or ID <input id="supplier" maxlength="120" required></label></p>
-          <div id="order-lines"></div>
-          <button id="add-order-line" type="button">Add item</button>
-          <button type="submit">Save purchase order</button>
-          <button id="new-order" type="button">New purchase order</button>
-        </form>
-        <template id="order-line-template">
-          <fieldset>
-            <legend>Order item</legend>
-            <label>Item ID <input data-key="item_id" maxlength="64" required></label>
-            <label>Quantity <input data-key="quantity" type="number" min="1" max="1000000" step="1" required></label>
-            <label>Unit price (INR) <input data-key="unit_price" inputmode="decimal" maxlength="24" required></label>
-            <button type="button">Remove item</button>
+          <fieldset id="order-fields" class="unboxed">
+            <div class="field-grid">
+              <label class="field">Order number<input id="order-number" required maxlength="64" pattern="[A-Z0-9][A-Z0-9_.\-]{0,63}" placeholder="PO-1042"></label>
+              <label class="field">Supplier name or ID<input id="supplier" required maxlength="120" placeholder="Acme Parts"></label>
+            </div>
+            <div class="order-editor-heading"><h3>Items</h3><span class="hint">Prices in INR</span></div>
+            <div id="order-lines"></div>
+            <button class="text-button" id="add-order-line" type="button">+ Add item</button>
+            <div class="submit-bar"><button class="primary" type="submit">Save purchase order</button><p id="order-status" class="status" role="status"></p></div>
           </fieldset>
-        </template>
-        <p id="order-status" role="status"></p>
-      </section>
-      <section aria-labelledby="invoice-heading">
-        <h2 id="invoice-heading">Reconcile an invoice</h2>
-        <ul>
-          <li><a href="/samples/clean-match.pdf">Clean match PDF</a></li>
-          <li><a href="/samples/price-mismatch.pdf">Price mismatch PDF</a></li>
-          <li><a href="/samples/ambiguous-extraction.pdf">Ambiguous extraction PDF</a></li>
-          <li>For the duplicate scenario, submit the clean match PDF twice.</li>
-        </ul>
-        <form id="upload-form">
-          <p>
-            <label for="invoice">Invoice PDF</label>
-            <input id="invoice" type="file" accept="application/pdf,.pdf" required>
-          </p>
-          <p>
-            <label for="order">Purchase order</label>
-            <select id="order">
-              <option value="PO-001">PO-001 · Reference order</option>
-              <option value="PO-002">PO-002 · Alternate order</option>
-            </select>
-            <button id="edit-order" type="button" disabled>Edit selected PO</button>
-          </p>
-          <p>
-            <label for="mode">Extraction</label>
-            <select id="mode">
-              <option value="rules">Rules</option>
-              <option value="replay">Sample replay</option>
-              <option value="live" disabled>Sample live AI</option>
-            </select>
-          </p>
-          <button type="submit">Reconcile</button>
         </form>
-        <p id="upload-status" role="status"></p>
-      </section>
-      <section id="review" aria-labelledby="review-heading" hidden>
-        <h2 id="review-heading">Review</h2>
-        <p id="review-verdict"></p>
-        <h3>Findings</h3>
-        <ul id="findings"></ul>
-        <h3>Purchase order</h3>
-        <ul id="order-values"></ul>
-        <h3>Invoice evidence</h3>
-        <ul id="evidence"></ul>
-        <form id="mapping-form" hidden>
-          <h3>Confirm supplier and item mappings</h3>
-          <p><label><input type="checkbox" id="confirm-supplier"> <span id="supplier-mapping-label"></span></label></p>
-          <div id="item-mappings"></div>
-          <button type="submit">Save mapping</button>
-        </form>
-        <p id="mapping-status" role="status"></p>
-        <ul id="mapping-history" aria-label="Mapping history"></ul>
-        <form id="decision-form">
-          <p>
-            <label for="decision">Decision</label>
-            <select id="decision">
-              <option value="accept">Accept</option>
-              <option value="reject">Reject</option>
-              <option value="hold">Hold</option>
-            </select>
-          </p>
-          <p>
-            <label for="note">Note (optional)</label>
-            <input id="note" type="text" maxlength="400">
-          </p>
-          <button type="submit">Save decision</button>
-        </form>
-        <p id="decision-status" role="status"></p>
-        <h3>Decision history</h3>
-        <ol id="history"></ol>
-      </section>
-      <p>Custom documents use rules. The session expires after 24 hours.</p>
-      <button type="button" id="delete-session">Clear session data</button>
-    </main>
+      </div>
+    </dialog>
+    <template id="order-line-template">
+      <fieldset class="order-line">
+        <legend class="visually-hidden">Order item</legend>
+        <label class="field">Item code<input required maxlength="64" pattern="[A-Z0-9][A-Z0-9_.\-]{0,63}" data-key="item_id" placeholder="PART-7"></label>
+        <label class="field">Quantity<input required type="number" min="1" max="1000000" step="1" data-key="quantity" placeholder="1"></label>
+        <label class="field">Unit price<input required inputmode="decimal" maxlength="24" data-key="unit_price" placeholder="1000.00"></label>
+        <button class="icon-button remove-line" type="button" aria-label="Remove order item">×</button>
+      </fieldset>
+    </template>
+    <dialog id="help-dialog" aria-labelledby="help-title">
+      <div class="dialog-inner">
+        <div class="dialog-heading"><h2 id="help-title">Using InvoiceMatch</h2><button id="close-help" class="icon-button" type="button" aria-label="Close help">×</button></div>
+        <dl class="help-list">
+          <div><dt>What can I upload?</dt><dd>One digitally generated INR invoice, up to 2 MiB and eight pages. Use a PDF with selectable text. Scans or unfamiliar layouts may require manual review.</dd></div>
+          <div><dt>What happens to my invoice?</dt><dd>The server checks custom invoices using local rules. It saves extracted fields, evidence excerpts, and decisions for up to 24 hours. You can clear the session early.</dd></div>
+          <div><dt>How can I try the AI?</dt><dd>Open Sample options and select Live AI. Live AI is available for the bundled samples when the server is configured for it.</dd></div>
+        </dl>
+        <p><a href="https://github.com/RenoX23/invoicematch-document-ai">View source and benchmark results ↗</a></p>
+      </div>
+    </dialog>
   </body>
 </html>

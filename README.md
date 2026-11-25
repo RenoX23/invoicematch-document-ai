@@ -2,7 +2,7 @@
 
 InvoiceMatch is an accounts-payable review app for text-based INR invoices. Enter a purchase order or run a bundled demo, inspect line-level findings with source excerpts, and save a decision with an audit history.
 
-**Status** — The expanded reviewer runs locally. The Phase 2 benchmark results are available. Final UI and public deployment follow.
+**Status** — The polished reviewer runs locally. The Phase 2 benchmark results are available. Public deployment follows local acceptance.
 
 The benchmark will measure whether model-assisted extraction catches more discrepancies than rules-only extraction and how that affects review volume, latency, and cost. Both extractors will use the same invoice evidence, return the same typed record, and run through the same deterministic reconciliation rules.
 
@@ -12,9 +12,9 @@ The benchmark will measure whether model-assisted extraction catches more discre
 docker compose up --build
 ```
 
-Open [the local reviewer](http://127.0.0.1:8000/). For a custom review, enter a PO number, supplier, and the order's item IDs, quantities, and INR prices. Save the PO, upload the matching invoice with **Rules**, and inspect the result. If the supplier or SKU names differ, confirm their mapping below the evidence and rerun the comparison. The original extraction stays in the audit history. Editing a PO creates a new version and existing reviews retain the version they compared.
+Open [the local reviewer](http://127.0.0.1:8000/). Under **Check my invoice**, upload a text-based INR PDF and choose a saved order or select **New purchase order**. Enter the order number, supplier, item codes, quantities, and unit prices. Select **Compare invoice**, then click a finding to see its invoice evidence. If supplier or item names differ, confirm the names below the comparison and compare again. The original extraction stays in the audit history. Editing an order creates a new version and existing reviews retain the version they compared.
 
-For the bundled flow, download a sample and choose `PO-001`. Select **Sample replay** for the recorded extraction or **Sample live AI** to call Groq. Submit the clean sample twice in the same mode to exercise duplicate handling. After saving a decision, reload the review page to see the history.
+Select **Try a sample** to compare a bundled invoice with its included order. The **Duplicate upload** sample compares the same PDF twice and shows the existing review. Open **Sample options** to choose **Live AI** when Groq is configured, or use **Sample replay** to see recorded extraction without credentials. After saving a decision, reload the review page to see the history.
 
 Compose binds to loopback and stores reviews in a named volume. Use `INVOICEMATCH_PORT` to select a different host port. Compose forwards `GROQ_API_KEY` from the shell or the ignored local `.env`. With a native install, launch `python -m uvicorn invoicematch.app:create_app --factory` and put the key in the server environment to enable live mode.
 

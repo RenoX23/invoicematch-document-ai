@@ -122,6 +122,9 @@ def create_app(
     resources = files("invoicematch")
     html = resources.joinpath("web", "index.html").read_text(encoding="utf-8")
     script = resources.joinpath("web", "review.js").read_text(encoding="utf-8")
+    stylesheet = resources.joinpath("web", "review.css").read_text(encoding="utf-8")
+    font = resources.joinpath("web", "instrument-sans.woff2").read_bytes()
+    favicon = resources.joinpath("web", "favicon.png").read_bytes()
     samples = {name: resources.joinpath("samples", name).read_bytes() for name in _SAMPLE_NAMES}
     sample_hashes = {sha256(data).hexdigest() for data in samples.values()}
     approved_hashes = sample_hashes | additional_approved_hashes
@@ -219,6 +222,18 @@ def create_app(
     @app.get("/review.js", include_in_schema=False)
     def reviewer_script() -> Response:
         return Response(script, media_type="text/javascript", headers=headers)
+
+    @app.get("/review.css", include_in_schema=False)
+    def reviewer_stylesheet() -> Response:
+        return Response(stylesheet, media_type="text/css", headers=headers)
+
+    @app.get("/instrument-sans.woff2", include_in_schema=False)
+    def reviewer_font() -> Response:
+        return Response(font, media_type="font/woff2", headers=headers)
+
+    @app.get("/favicon.png", include_in_schema=False)
+    def reviewer_favicon() -> Response:
+        return Response(favicon, media_type="image/png", headers=headers)
 
     @app.get("/samples/{filename}", include_in_schema=False)
     def download_sample(filename: str) -> Response:

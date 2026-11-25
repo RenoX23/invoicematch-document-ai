@@ -11,3 +11,7 @@
 !src/invoicematch/web/
 !src/invoicematch/web/*.html
 !src/invoicematch/web/*.js
+!src/invoicematch/web/*.css
+!src/invoicematch/web/*.woff2
+!src/invoicematch/web/*-OFL.txt
+!src/invoicematch/web/favicon.png
