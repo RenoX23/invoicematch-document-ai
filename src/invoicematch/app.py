@@ -9,11 +9,13 @@ from contextlib import asynccontextmanager, suppress
 from decimal import Decimal
 from functools import partial
 from hashlib import sha256
+from hmac import compare_digest
 from importlib.resources import files
 from pathlib import Path
 from threading import BoundedSemaphore
 from typing import Annotated, TypeVar
 
+import psycopg
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import TypeAdapter, ValidationError
@@ -114,11 +116,21 @@ class OrderCatalog(Contract):
 def create_app(
     database_path: Path | None = None,
     *,
+    database_url: str | None = None,
+    serverless: bool = False,
     additional_approved_hashes: frozenset[str] = frozenset(),
     live_runner: Callable[[tuple[str, ...]], Invocation] | None = None,
 ) -> FastAPI:
-    path = database_path or Path(os.environ.get("INVOICEMATCH_DB_PATH", "instance/reviews.sqlite3"))
-    store = ReviewStore(path)
+    if database_path is not None and (database_url is not None or serverless):
+        raise ValueError("Choose one database target. Serverless mode requires PostgreSQL.")
+    url = database_url if database_url is not None else os.getenv("DATABASE_URL", "")
+    if serverless and not url.strip():
+        raise ValueError("Set DATABASE_URL to the PostgreSQL connection URL.")
+    store = ReviewStore(
+        database_path
+        or url.strip()
+        or Path(os.environ.get("INVOICEMATCH_DB_PATH", "instance/reviews.sqlite3"))
+    )
     resources = files("invoicematch")
     html = resources.joinpath("web", "index.html").read_text(encoding="utf-8")
     script = resources.joinpath("web", "review.js").read_text(encoding="utf-8")
@@ -138,7 +150,7 @@ def create_app(
     parser_slots = BoundedSemaphore(2)
     live_slots = BoundedSemaphore(2)
     upload_slots = asyncio.Semaphore(16)
-    secure_cookie = os.environ.get("INVOICEMATCH_SECURE_COOKIE") == "1"
+    secure_cookie = serverless or os.environ.get("INVOICEMATCH_SECURE_COOKIE") == "1"
     headers = {
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
@@ -154,7 +166,7 @@ def create_app(
                 await asyncio.sleep(300)
                 try:
                     await run_in_threadpool(store.purge_expired)
-                except sqlite3.Error:
+                except (sqlite3.Error, psycopg.Error):
                     _LOG.warning("Review session cleanup could not complete.")
 
         cleanup = asyncio.create_task(expire())
@@ -165,7 +177,12 @@ def create_app(
             with suppress(asyncio.CancelledError):
                 await cleanup
 
-    app = FastAPI(title="InvoiceMatch", lifespan=lifespan, docs_url=None, redoc_url=None)
+    app = FastAPI(
+        title="InvoiceMatch",
+        lifespan=None if serverless else lifespan,
+        docs_url=None,
+        redoc_url=None,
+    )
 
     def require_session(request: Request) -> str:
         key = store.session_key(request.cookies.get(_SESSION_COOKIE))
@@ -192,9 +209,40 @@ def create_app(
             headers={"Retry-After": "2", **headers},
         )
 
+    @app.exception_handler(psycopg.OperationalError)
+    @app.exception_handler(psycopg.errors.UndefinedTable)
+    async def postgres_error(_: Request, error: psycopg.Error) -> JSONResponse:
+        _LOG.warning("PostgreSQL review store unavailable (%s).", type(error).__name__)
+        return JSONResponse(
+            {
+                "detail": {
+                    "code": "store_busy",
+                    "message": "The review store is unavailable. Try again.",
+                }
+            },
+            status_code=503,
+            headers={"Retry-After": "2", **headers},
+        )
+
     @app.get("/health", include_in_schema=False)
-    def health() -> dict[str, str]:
+    def health(response: Response) -> dict[str, str]:
+        if serverless:
+            store.check_ready()
+            response.headers.update(headers)
         return {"status": "ok"}
+
+    if serverless:
+        cron_secret = os.getenv("CRON_SECRET", "")
+
+        @app.get("/api/maintenance/purge", include_in_schema=False, status_code=204)
+        def purge_expired(request: Request) -> Response:
+            authorization = request.headers.get("authorization", "")
+            if not cron_secret or not compare_digest(
+                authorization.encode(), f"Bearer {cron_secret}".encode()
+            ):
+                raise _problem(401, "unauthorized", "Invalid maintenance credentials.")
+            store.purge_expired()
+            return Response(status_code=204, headers=headers)
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     def reviewer(request: Request) -> HTMLResponse:

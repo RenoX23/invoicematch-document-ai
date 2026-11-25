@@ -20,6 +20,7 @@ dist/
 htmlcov/
 
 # Local credentials and runtime data
+/.vercel/
 .env
 .env.*
 !.env.example

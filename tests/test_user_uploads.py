@@ -1,8 +1,7 @@
 import asyncio
-import sqlite3
 import subprocess
 from collections.abc import AsyncIterator, Callable
-from contextlib import asynccontextmanager, closing
+from contextlib import asynccontextmanager
 from importlib.resources import files
 from io import BytesIO
 from pathlib import Path
@@ -14,6 +13,7 @@ from pypdf import PdfReader, PdfWriter
 
 from invoicematch import storage, workers
 from invoicematch.app import create_app
+from invoicematch.database import Database
 from invoicematch.model import Invocation
 from invoicematch.pdf import MAX_CUSTOM_PDF_BYTES, PdfInputError
 from scripts.generate_demo_fixtures import _text_pdf
@@ -28,9 +28,13 @@ def anyio_backend() -> str:
 
 @asynccontextmanager
 async def reviewer(
-    path: Path, live: Callable[[tuple[str, ...]], Invocation] | None = None
+    path: Path | str, live: Callable[[tuple[str, ...]], Invocation] | None = None
 ) -> AsyncIterator[AsyncClient]:
-    app = create_app(path, live_runner=live)
+    app = create_app(
+        path if isinstance(path, Path) else None,
+        database_url=path if isinstance(path, str) else None,
+        live_runner=live,
+    )
     async with (
         app.router.lifespan_context(app),
         AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client,
@@ -103,8 +107,7 @@ async def upload(
     )
 
 
-async def test_unseen_invoice_total_and_po_snapshot_survive_restart(tmp_path: Path) -> None:
-    database = tmp_path / "reviews.sqlite3"
+async def test_unseen_invoice_total_and_po_snapshot_survive_restart(database: Path | str) -> None:
     async with reviewer(database) as client:
         saved = await save_order(client)
         assert saved.status_code == 200
@@ -138,14 +141,14 @@ async def test_unseen_invoice_total_and_po_snapshot_survive_restart(tmp_path: Pa
         assert earlier["decisions"][0]["decision"] == "accept"
 
 
-async def test_gst_ambiguity_and_bad_grand_total_fail_closed(tmp_path: Path) -> None:
-    async with reviewer(tmp_path / "reviews.sqlite3") as client:
+async def test_gst_ambiguity_and_bad_grand_total_fail_closed(database: Path | str) -> None:
+    async with reviewer(database) as client:
         await save_order(client)
         mismatch = (await upload(client, invoice(total="1185.00"))).json()
         assert "invoice_total_mismatch" in {
             finding["code"] for finding in mismatch["result"]["findings"]
         }
-    async with reviewer(tmp_path / "reviews.sqlite3") as client:
+    async with reviewer(database) as client:
         await save_order(client)
         response = await upload(
             client, invoice(amounts=("CGST: 90.00", "SGST: 90.00", "Tax: 180.00"))
@@ -155,8 +158,8 @@ async def test_gst_ambiguity_and_bad_grand_total_fail_closed(tmp_path: Path) -> 
         assert "ambiguous_tax_components" in {finding["code"] for finding in result["findings"]}
 
 
-async def test_mapping_is_audited_and_keeps_original_extraction(tmp_path: Path) -> None:
-    async with reviewer(tmp_path / "reviews.sqlite3") as client:
+async def test_mapping_is_audited_and_keeps_original_extraction(database: Path | str) -> None:
+    async with reviewer(database) as client:
         await save_order(client)
         response = await upload(client, invoice(supplier="Acme Trading", item="ACME-7"))
         original = response.json()
@@ -199,13 +202,12 @@ async def test_mapping_is_audited_and_keeps_original_extraction(tmp_path: Path) 
         assert [event["verdict"] for event in current.json()["decisions"]] == ["mismatch", "match"]
 
 
-async def test_cached_review_requires_active_session_after_streaming(tmp_path: Path) -> None:
-    database = tmp_path / "reviews.sqlite3"
+async def test_cached_review_requires_active_session_after_streaming(database: Path | str) -> None:
     data = sample()
 
     async def expiring_upload() -> AsyncIterator[bytes]:
         yield data[:16]
-        with closing(sqlite3.connect(database)) as connection, connection:
+        with Database(database).transaction(write=True) as connection:
             connection.execute("UPDATE session_expiry SET expires_at=0")
         yield data[16:]
 
@@ -221,8 +223,9 @@ async def test_cached_review_requires_active_session_after_streaming(tmp_path: P
         assert retry.json()["detail"]["code"] == "session_expired"
 
 
-async def test_custom_data_is_private_and_session_deletion_cleans_records(tmp_path: Path) -> None:
-    database = tmp_path / "reviews.sqlite3"
+async def test_custom_data_is_private_and_session_deletion_cleans_records(
+    database: Path | str,
+) -> None:
     async with reviewer(database) as first:
         await save_order(first)
         created = (await upload(first, invoice())).json()["review_id"]
@@ -233,28 +236,27 @@ async def test_custom_data_is_private_and_session_deletion_cleans_records(tmp_pa
             assert (await second.put(f"/api/reviews/{created}/mapping", json={})).status_code == 404
         assert (await first.delete("/api/session")).status_code == 204
         assert (await first.get(f"/api/reviews/{created}")).status_code == 401
-    with closing(sqlite3.connect(database)) as connection:
+    with Database(database).transaction() as connection:
         for table in ("saved_orders", "reviews", "review_inputs"):
-            assert connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone() == (0,)
+            assert connection.count(f"SELECT COUNT(*) AS total FROM {table}") == 0
 
 
-async def test_expired_sessions_are_purged(tmp_path: Path) -> None:
-    database = tmp_path / "reviews.sqlite3"
+async def test_expired_sessions_are_purged(database: Path | str) -> None:
     async with reviewer(database) as client:
         await save_order(client)
-        with closing(sqlite3.connect(database)) as connection, connection:
+        with Database(database).transaction(write=True) as connection:
             connection.execute("UPDATE session_expiry SET expires_at=0")
         assert (await client.get("/api/orders")).status_code == 401
         storage.ReviewStore(database).purge_expired()
-    with closing(sqlite3.connect(database)) as connection:
-        assert connection.execute("SELECT COUNT(*) FROM saved_orders").fetchone() == (0,)
+    with Database(database).transaction() as connection:
+        assert connection.count("SELECT COUNT(*) AS total FROM saved_orders") == 0
 
 
-async def test_custom_pdf_checks_and_no_provider_transmission(tmp_path: Path) -> None:
+async def test_custom_pdf_checks_and_no_provider_transmission(database: Path | str) -> None:
     def unexpected(_: tuple[str, ...]) -> Invocation:
         pytest.fail("Custom invoice reached the provider.")
 
-    async with reviewer(tmp_path / "reviews.sqlite3", unexpected) as client:
+    async with reviewer(database, unexpected) as client:
         await save_order(client)
         denied = await upload(client, invoice(), mode="live")
         assert denied.json()["detail"]["code"] == "sample_mode_only"
@@ -269,7 +271,7 @@ async def test_custom_pdf_checks_and_no_provider_transmission(tmp_path: Path) ->
 
 @pytest.mark.parametrize("add_title", [False, True])
 async def test_unreadable_page_cannot_be_ignored_in_an_otherwise_matching_pdf(
-    tmp_path: Path, add_title: bool
+    database: Path | str, add_title: bool
 ) -> None:
     output = BytesIO()
     writer = PdfWriter()
@@ -279,7 +281,7 @@ async def test_unreadable_page_cannot_be_ignored_in_an_otherwise_matching_pdf(
     else:
         writer.add_blank_page(width=612, height=792)
     writer.write(output)
-    async with reviewer(tmp_path / "reviews.sqlite3") as client:
+    async with reviewer(database) as client:
         await save_order(client)
         uploaded = await upload(client, output.getvalue())
         assert uploaded.status_code == 201
@@ -289,10 +291,10 @@ async def test_unreadable_page_cannot_be_ignored_in_an_otherwise_matching_pdf(
 
 
 async def test_replays_preserve_all_sample_scenarios_without_provider(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    database: Path | str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
-    async with reviewer(tmp_path / "reviews.sqlite3") as client:
+    async with reviewer(database) as client:
         for name, expected in (
             ("clean-match.pdf", "match"),
             ("price-mismatch.pdf", "mismatch"),
@@ -309,7 +311,7 @@ async def test_replays_preserve_all_sample_scenarios_without_provider(
         assert unavailable.json()["detail"]["code"] == "live_unavailable"
 
 
-async def test_live_timeout_is_recorded_once_under_concurrent_retries(tmp_path: Path) -> None:
+async def test_live_timeout_is_recorded_once_under_concurrent_retries(database: Path | str) -> None:
     started = Event()
     release = Event()
     calls = []
@@ -320,7 +322,7 @@ async def test_live_timeout_is_recorded_once_under_concurrent_retries(tmp_path: 
         assert release.wait(5)
         return Invocation(claims=None, error="provider_timeout")
 
-    async with reviewer(tmp_path / "reviews.sqlite3", delayed) as client:
+    async with reviewer(database, delayed) as client:
         initial = asyncio.create_task(upload(client, sample(), mode="live", order="PO-001"))
         try:
             assert await asyncio.to_thread(started.wait, 5)
@@ -337,7 +339,7 @@ async def test_live_timeout_is_recorded_once_under_concurrent_retries(tmp_path: 
 
 
 async def test_live_budget_applies_across_sessions(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    database: Path | str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(storage, "LIVE_PER_DAY", 1)
     calls = []
@@ -346,7 +348,6 @@ async def test_live_budget_applies_across_sessions(
         calls.append(pages)
         return Invocation(claims=None, error="provider_timeout")
 
-    database = tmp_path / "reviews.sqlite3"
     async with reviewer(database, fake) as first:
         assert (await upload(first, sample(), mode="live", order="PO-001")).status_code == 201
     async with reviewer(database, fake) as second:

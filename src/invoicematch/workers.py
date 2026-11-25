@@ -4,9 +4,13 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Literal
 
+import pydantic
+import pydantic_core
+import pypdf
 from pydantic import TypeAdapter
 
 from invoicematch.model import Invocation, invoke_groq
@@ -17,13 +21,25 @@ LIVE_DEADLINE = 12
 _MAX_OUTPUT = 512 * 1024
 _MEMORY_LIMIT = 256 * 1024 * 1024
 _PAGES = TypeAdapter(tuple[str, ...])
+_BOOTSTRAP = (
+    "import json, runpy, sys;"
+    "sys.path[:0] = json.loads(sys.argv.pop(1));"
+    "runpy.run_module('invoicematch.workers', run_name='__main__')"
+)
+
+
+def _worker_import_roots() -> tuple[str, ...]:
+    # Vercel inserts vendored dependencies into the parent interpreter's search path.
+    # Resolve only known installed packages so the isolated worker still ignores PYTHONPATH.
+    paths = (__file__, pydantic.__file__, pydantic_core.__file__, pypdf.__file__)
+    return tuple(dict.fromkeys(str(Path(path).resolve().parents[1]) for path in paths if path))
 
 
 def _worker(mode: Literal["pdf", "live"], payload: bytes, timeout: float) -> bytes:
     env = {key: os.environ[key] for key in ("SystemRoot", "WINDIR") if key in os.environ}
     with TemporaryDirectory(prefix="invoicematch-") as working_dir:
         run = subprocess.run(
-            [sys.executable, "-I", "-m", "invoicematch.workers", mode],
+            [sys.executable, "-I", "-c", _BOOTSTRAP, json.dumps(_worker_import_roots()), mode],
             input=payload,
             capture_output=True,
             cwd=working_dir,

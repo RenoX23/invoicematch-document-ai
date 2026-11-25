@@ -1,0 +1,16 @@
+.env*
+.venv/
+.vercel/
+.git/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+agent.md
+project.md
+AGENTS.md
+instance/
+build/
+dist/
+tests/
+benchmarks/
+scripts/

@@ -1,7 +1,6 @@
 import asyncio
-import sqlite3
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager, closing
+from contextlib import asynccontextmanager
 from hashlib import sha256
 from importlib.resources import files
 from io import BytesIO
@@ -12,6 +11,7 @@ from httpx import ASGITransport, AsyncClient, Response
 from pypdf import PdfWriter
 
 from invoicematch.app import create_app
+from invoicematch.database import Database
 from invoicematch.pdf import MAX_PDF_BYTES
 
 pytestmark = pytest.mark.anyio
@@ -28,10 +28,11 @@ def _sample(name: str = "clean-match.pdf") -> bytes:
 
 @asynccontextmanager
 async def _client(
-    database: Path, *, approved_extra: tuple[bytes, ...] = ()
+    database: Path | str, *, approved_extra: tuple[bytes, ...] = ()
 ) -> AsyncIterator[AsyncClient]:
     app = create_app(
-        database,
+        database if isinstance(database, Path) else None,
+        database_url=database if isinstance(database, str) else None,
         additional_approved_hashes=frozenset(sha256(data).hexdigest() for data in approved_extra),
     )
     async with (
@@ -50,8 +51,8 @@ async def _submit(client: AsyncClient, data: bytes, order_id: str = "PO-001") ->
     )
 
 
-async def test_reviewer_serves_its_assets_under_the_same_origin(tmp_path: Path) -> None:
-    async with _client(tmp_path / "reviews.sqlite3") as client:
+async def test_reviewer_serves_its_assets_under_the_same_origin(database: Path | str) -> None:
+    async with _client(database) as client:
         page = await client.get("/")
         assert "default-src 'self'" in page.headers["content-security-policy"]
         for path, content_type in (
@@ -75,8 +76,7 @@ async def test_reviewer_serves_its_assets_under_the_same_origin(tmp_path: Path) 
         ("ambiguous-extraction.pdf", "needs_review"),
     ],
 )
-async def test_normal_upload_path(tmp_path: Path, filename: str, verdict: str) -> None:
-    database = tmp_path / "reviews.sqlite3"
+async def test_normal_upload_path(database: Path | str, filename: str, verdict: str) -> None:
     async with _client(database) as client:
         assert (await client.get("/health")).json() == {"status": "ok"}
         assert "Check an invoice against a purchase order" in (await client.get("/")).text
@@ -96,12 +96,11 @@ async def test_normal_upload_path(tmp_path: Path, filename: str, verdict: str) -
         finding = review["result"]["findings"][0]
         assert finding["code"] == "unverified_line"
         assert "A-10" in finding["evidence"]["excerpt"]
-    with closing(sqlite3.connect(database)) as connection:
-        assert connection.execute("SELECT COUNT(*) FROM reviews").fetchone() == (1,)
+    with Database(database).transaction() as connection:
+        assert connection.count("SELECT COUNT(*) AS total FROM reviews") == 1
 
 
-async def test_duplicate_workflow_and_decision_survive_worker_restart(tmp_path: Path) -> None:
-    database = tmp_path / "reviews.sqlite3"
+async def test_duplicate_workflow_and_decision_survive_worker_restart(database: Path | str) -> None:
     async with _client(database) as client:
         response = await client.get("/")
         assert "httponly" in response.headers["set-cookie"].lower()
@@ -109,6 +108,11 @@ async def test_duplicate_workflow_and_decision_survive_worker_restart(tmp_path: 
         created = await _submit(client, _sample())
         assert created.status_code == 201
         review_id = created.json()["review_id"]
+        invalid = await client.post(
+            f"/api/reviews/{review_id}/decisions",
+            json={"decision": "accept", "note": "bad\x00note"},
+        )
+        assert invalid.status_code == 422
         saved = await client.post(
             f"/api/reviews/{review_id}/decisions",
             json={"decision": "accept", "note": "Checked lines."},
@@ -123,25 +127,26 @@ async def test_duplicate_workflow_and_decision_survive_worker_restart(tmp_path: 
         repeated = await _submit(client, _sample())
         assert repeated.status_code == 200
         assert repeated.json() == record.json()
-    with closing(sqlite3.connect(database)) as connection:
-        assert connection.execute("SELECT COUNT(*) FROM reviews").fetchone() == (1,)
-        assert connection.execute("SELECT COUNT(*) FROM decision_events").fetchone() == (1,)
+    with Database(database).transaction() as connection:
+        assert connection.count("SELECT COUNT(*) AS total FROM reviews") == 1
+        assert connection.count("SELECT COUNT(*) AS total FROM decision_events") == 1
 
 
-async def test_concurrent_api_retries_commit_only_one_review(tmp_path: Path) -> None:
-    database = tmp_path / "reviews.sqlite3"
-    async with _client(database) as client:
-        await client.get("/")
-        responses = await asyncio.gather(*(_submit(client, _sample()) for _ in range(8)))
+async def test_concurrent_api_retries_commit_only_one_review(database: Path | str) -> None:
+    async with _client(database) as first, _client(database) as second:
+        await first.get("/")
+        second.cookies.update(first.cookies)
+        responses = await asyncio.gather(
+            *(_submit(client, _sample()) for client in (first, second) * 4)
+        )
 
     assert sorted(response.status_code for response in responses) == [200] * 7 + [201]
     assert len({response.json()["review_id"] for response in responses}) == 1
-    with closing(sqlite3.connect(database)) as connection:
-        assert connection.execute("SELECT COUNT(*) FROM reviews").fetchone() == (1,)
+    with Database(database).transaction() as connection:
+        assert connection.count("SELECT COUNT(*) AS total FROM reviews") == 1
 
 
-async def test_sessions_cannot_read_or_change_each_others_reviews(tmp_path: Path) -> None:
-    database = tmp_path / "reviews.sqlite3"
+async def test_sessions_cannot_read_or_change_each_others_reviews(database: Path | str) -> None:
     async with _client(database) as client:
         assert (await _submit(client, _sample())).status_code == 401
         await client.get("/")
@@ -160,11 +165,13 @@ async def test_sessions_cannot_read_or_change_each_others_reviews(tmp_path: Path
         assert second.json()["review_id"] != review_id
 
 
-async def test_changed_invoice_bytes_and_conflicting_order_need_review(tmp_path: Path) -> None:
+async def test_changed_invoice_bytes_and_conflicting_order_need_review(
+    database: Path | str,
+) -> None:
     changed = _sample().replace(b"SYNTHETIC INVOICE", b"SYNTHETIC REPRINT")
     assert changed != _sample()
     assert len(changed) == len(_sample())
-    async with _client(tmp_path / "reviews.sqlite3", approved_extra=(changed,)) as client:
+    async with _client(database, approved_extra=(changed,)) as client:
         await client.get("/")
         original = await _submit(client, _sample())
         duplicate = await _submit(client, changed)
@@ -178,7 +185,7 @@ async def test_changed_invoice_bytes_and_conflicting_order_need_review(tmp_path:
         assert retry.json() == original.json()
 
 
-async def test_upload_boundaries_and_unreadable_documents(tmp_path: Path) -> None:
+async def test_upload_boundaries_and_unreadable_documents(database: Path | str) -> None:
     writer = PdfWriter()
     writer.add_blank_page(width=612, height=792)
     blank_pdf = BytesIO()
@@ -186,7 +193,6 @@ async def test_upload_boundaries_and_unreadable_documents(tmp_path: Path) -> Non
     unreadable = blank_pdf.getvalue()
     corrupt = b"%PDF-1.4\ninvalid"
     wrong_currency = _sample().replace(b"Currency: INR", b"Currency: USD")
-    database = tmp_path / "reviews.sqlite3"
     async with _client(database, approved_extra=(unreadable, corrupt, wrong_currency)) as client:
         await client.get("/")
         for data, order, status, code in (
@@ -204,5 +210,5 @@ async def test_upload_boundaries_and_unreadable_documents(tmp_path: Path) -> Non
         currency = await _submit(client, wrong_currency)
         assert currency.status_code == 201
         assert currency.json()["result"]["findings"][0]["code"] == "unsupported_currency"
-    with closing(sqlite3.connect(database)) as connection:
-        assert connection.execute("SELECT COUNT(*) FROM reviews").fetchone() == (2,)
+    with Database(database).transaction() as connection:
+        assert connection.count("SELECT COUNT(*) AS total FROM reviews") == 2

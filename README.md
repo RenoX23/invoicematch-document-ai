@@ -18,11 +18,22 @@ Select **Try a sample** to compare a bundled invoice with its included order. Th
 
 Compose binds to loopback and stores reviews in a named volume. Use `INVOICEMATCH_PORT` to select a different host port. Compose forwards `GROQ_API_KEY` from the shell or the ignored local `.env`. With a native install, launch `python -m uvicorn invoicematch.app:create_app --factory` and put the key in the server environment to enable live mode.
 
+## Deploy with Vercel and Neon
+
+The Vercel entry point is `asgi.py`. It serves the browser UI and API together, requires PostgreSQL, and sends session cookies over HTTPS. Vercel runs Python 3.12 in Singapore and schedules expired-record cleanup once a day. Access expires at 24 hours. **Clear session data** deletes active session data immediately.
+
+1. Connect the repository to a Vercel project and add a Neon database in the same region. Use separate Neon branches for preview and production.
+2. Install the package with `python -m pip install -e .`. Set `INVOICEMATCH_MIGRATION_URL` in your local shell to the target branch's direct Neon connection URL, then run `python -m invoicematch.migrate` once per branch. The command can be retried. New hosted sessions start in PostgreSQL. Existing local SQLite sessions remain on the local installation.
+3. Set the pooled Neon connection URL as the server-only `DATABASE_URL` in each Vercel environment. Keep Neon’s TLS and channel-binding parameters in both URLs. Set `GROQ_API_KEY` for sample-only Live AI and `CRON_SECRET` to a random secret for the daily purge. The Neon integration can supply `DATABASE_URL` automatically.
+4. Deploy a preview and check `/health`. From a fresh browser, run the samples, upload a custom PDF with a saved PO, and save a decision. Confirm the review survives reload and redeploy, a second browser cannot access it, and Live AI works on a bundled sample. Verify the production deployment and tag the tested Git revision.
+
+Use a prior verified deployment in Vercel for a code rollback. The Neon data stays on the target branch during a rollback. Check the health route and the review workflow after rolling back.
+
 ### Supported invoices and limits
 
 - Custom reviews support one full, digitally generated INR invoice against one PO, with positive whole-number quantities. PDFs can be up to 2 MiB and eight pages. The parser recognizes labels such as **SKU**, **Qty**, and **Unit rate** in a positioned table. It expects a standalone, left-aligned **Invoice total** or **Grand total**. Image-only scans and layouts outside the supported grammar surface as review cases.
 - The rules compare corresponding line items at exact decimal values. They check the printed subtotal when present and validate the grand total with separately stated tax, freight, and discount amounts. Tax can use one aggregate amount, a CGST/SGST pair, or IGST. Conflicting breakdowns require review. Tax amounts come from the invoice.
-- Custom PDFs run in a separate parser process with a six-second deadline. The Linux container also caps parser CPU time and virtual memory. Custom invoice text stays on the reviewer server. The reviewer saves extracted fields and evidence excerpts, the PO snapshot, and decisions. Sessions expire after 24 hours. Use **Clear session data** to delete a session early.
+- Custom PDFs run in a separate parser process with a six-second deadline. On Linux, the parser also caps CPU time and virtual memory. The reviewer processes custom invoices locally to the backend and saves extracted fields, evidence excerpts, the PO snapshot, and decisions in its database. Custom invoice text is never sent to Groq. Sessions expire after 24 hours. Use **Clear session data** to delete a session early.
 - Live AI accepts only the bundled samples. The server enforces a provider deadline, suppresses concurrent repeat calls for the same review, and caps live attempts per session, per minute, and per day. Provider failure is visible in the review. Replay uses the stored sample extraction and runs without a key.
 
 ```mermaid
