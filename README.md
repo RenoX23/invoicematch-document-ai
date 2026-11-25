@@ -2,7 +2,7 @@
 
 InvoiceMatch is an accounts-payable review app for text-based INR invoices. Enter a purchase order or run a bundled demo, inspect line-level findings with source excerpts, and save a decision with an audit history.
 
-**Status** — The polished reviewer runs locally. The Phase 2 benchmark results are available. Public deployment follows local acceptance.
+**Live demo** — [Open InvoiceMatch](https://invoicematch-inky.vercel.app). Start with **Try a sample → Price mismatch**, or check a supported text-based INR invoice against your own purchase order.
 
 The benchmark will measure whether model-assisted extraction catches more discrepancies than rules-only extraction and how that affects review volume, latency, and cost. Both extractors will use the same invoice evidence, return the same typed record, and run through the same deterministic reconciliation rules.
 
@@ -28,6 +28,8 @@ The Vercel entry point is `asgi.py`. It serves the browser UI and API together, 
 4. Deploy a preview and check `/health`. From a fresh browser, run the samples, upload a custom PDF with a saved PO, and save a decision. Confirm the review survives reload and redeploy, a second browser cannot access it, and Live AI works on a bundled sample. Verify the production deployment and tag the tested Git revision.
 
 Use a prior verified deployment in Vercel for a code rollback. The Neon data stays on the target branch during a rollback. Check the health route and the review workflow after rolling back.
+
+Release [`v0.1.0`](https://github.com/RenoX23/invoicematch-document-ai/tree/v0.1.0) runs revision `17ebbd1`. Hosted checks covered all four replay scenarios, custom PDF parsing, reviewer mappings, a live Groq sample, the per-session Live AI cap, session isolation and deletion, and a saved decision across redeploy. The independent review verified the public sample finding against its PDF excerpt. [CI for the deployed revision](https://github.com/RenoX23/invoicematch-document-ai/actions/runs/45644562627)
 
 ### Supported invoices and limits
 
